@@ -1,0 +1,22 @@
+-- Bank / cash GL should post Sale WITHOUT AddAmount (transfer fee).
+-- App saves: TotalAmount = goods+tax-discount, AddAmount = bank fee.
+-- Voucher_TM / Invoice print uses TotalAmount + AddAmount for display စုစုပေါင်း.
+-- Customer receivable (credit) includes AddAmount on Sales debit; after money-in,
+-- CustomerBalanceDetail credits AddAmount under AccountName N'ဘဏ်ဝန်ဆောင်ခ'.
+--
+-- Deploy:
+--   1) docs/sql/GeneralLedgerDetailReport_ExcludeAddAmount.sql
+--        Sale bank Debit = Amount - Discount + TaxAmount  (never AddAmount)
+--   2) docs/sql/SaleHead_TotalAmount_ExcludeAddAmount_Repair.sql  (optional data fix)
+--   3) docs/sql/CustomerBalanceDetail_IncludeAddAmount.sql
+--        Sales debit = TotalAmount + AddAmount - PaidAmount
+--        money-in (IE/transfer FIFO on goods) → Credit AddAmount as ဘဏ်ဝန်ဆောင်ခ
+--   4) dbo.GetCustomerBalance — same TotalAmount+AddAmount / fee-clear if needed
+--
+-- Example:
+--   Debit Bank Account      = Amount - Discount + TaxAmount   -- 396,000
+--   CustomerBalance Sales   = 396,000 + AddAmount             -- 396,893
+--   IE / payment Credit     = 396,000
+--   ဘဏ်ဝန်ဆောင်ခ Credit      = AddAmount                      -- 893 → balance 0
+--
+-- No SaleHead schema change required.

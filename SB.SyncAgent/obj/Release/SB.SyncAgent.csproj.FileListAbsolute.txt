@@ -1,0 +1,6 @@
+D:\Project\SB\SB.SyncAgent\bin\Release\SB.SyncAgent.exe.config
+D:\Project\SB\SB.SyncAgent\bin\Release\SB.SyncAgent.exe
+D:\Project\SB\SB.SyncAgent\bin\Release\SB.SyncAgent.pdb
+D:\Project\SB\SB.SyncAgent\obj\Release\SB.SyncAgent.csprojResolveAssemblyReference.cache
+D:\Project\SB\SB.SyncAgent\obj\Release\SB.SyncAgent.exe
+D:\Project\SB\SB.SyncAgent\obj\Release\SB.SyncAgent.pdb
