@@ -1,0 +1,232 @@
+# SB2-Cloud Sync Bootstrap Playbook
+
+Port **SB** Local↔Cloud sync (L2C / C2L) + **SyncAgent** + **Tray (SyncStatus)** + **UserRights** into a **new repo `SB2-Cloud`**.
+
+## Repo & environment (mandatory)
+
+| Rule | Detail |
+|------|--------|
+| New repo | Work in **`SB2-Cloud`** — do **not** change live **SB** production repo |
+| First target | **Dev PC Local SQL** + **Test Cloud** only |
+| Forbidden (until Dev green) | Live/production DB, Client PC ERP folder, live SyncAgent on customer PCs |
+| Cutover | Separate task after `docs/SB2_DEV_TEST_RESULTS.md` is green |
+
+## Source of truth (reference SB repo — copy from, do not edit for this port)
+
+| Area | Where in SB |
+|------|-------------|
+| Architecture | `docs/DATA_SYNC_ARCHITECTURE.md` |
+| Client deploy | `docs/DATA_SYNC_CLIENT_DEPLOYMENT.md`, `docs/CLIENT_PC_DEPLOY.md` |
+| Connections pattern | `docs/config/CLIENT_CONNECTIONS.md` |
+| Agent | `SB.SyncAgent/` (`DBConnection.ini`, `CloudConnection.ini`, RC4 key `27042005`) |
+| Tray | `SB.SyncStatus/` |
+| Core SQL | `docs/sql/DataSync_01_Schema.sql` … `DataSync_15_*.sql`, `DataSync_28_*.sql` |
+| Detail hard-delete | `Deploy_TxnDetail_HardDeleteSync_LOCAL/CLOUD.sql` |
+| Head soft-delete finish | `Deploy_EditDeleteSync_LOCAL/CLOUD.sql` |
+| UserRights L2C-only | `DataSync_UserRights_L2C_Only.sql` + `_Local.sql` |
+| Entry rights policy | `README_UserEntryRights_Deploy.md` |
+| Cursor paste prompt | `docs/SB2_PORT_PROMPT.md` |
+| History ListView UX | `docs/SB2_HistoryListView_Port.md` |
+
+## Target flow (required) — Dev / Test only
+
+```text
+┌──────────────────────────────────┐
+│ 0. New repo SB2-Cloud            │  copy scripts/agent/UI from SB reference
+└──────────────┬───────────────────┘
+               ▼
+┌──────────────────────────────────┐
+│ 1. Prepare DEV LOCAL completely  │  schema + capture + UserRights + verify
+└──────────────┬───────────────────┘
+               │ backup .bak
+               ▼
+┌──────────────────────────────────┐
+│ 2. Restore .bak → TEST CLOUD DB  │  schema/data parity (not production)
+└──────────────┬───────────────────┘
+               │
+               ▼
+┌──────────────────────────────────┐
+│ 3. Test-Cloud-only scripts       │  C2L capture, CaptureCloud flags,
+│                                  │  UserRights C2L off, Detail/Head packs
+└──────────────┬───────────────────┘
+               │
+               ▼
+┌──────────────────────────────────┐
+│ 4. SyncAgent + Tray on DEV PC    │  Dev Local + Test Cloud ini only
+└──────────────┬───────────────────┘
+               ▼
+┌──────────────────────────────────┐
+│ 4b. History ListView UX on DEV   │  footer, progress, MultiSelect, columns
+└──────────────┬───────────────────┘
+               ▼
+┌──────────────────────────────────┐
+│ 5. Acceptance Dev↔Test + H1–H8   │  then STOP — ask before Live/Client
+└──────────────────────────────────┘
+```
+
+Why Local-first restore: SyncAgent syncs **data**, not DDL. Restoring Dev Local→Test Cloud avoids missing columns/procs on Cloud.
+
+---
+
+## Phase checklist
+
+### A. Connections (DEV / TEST only)
+
+Fill from `docs/config/SB2_CONNECTIONS.template.md` → `SB2_CONNECTIONS.md` in **SB2-Cloud**.  
+Use **Dev PC Local + Test Cloud** only. **Do not commit passwords.**  
+Do not put Live/Client endpoints in this phase.
+
+Encrypted files next to agent (names must match `ConnectionIni.cs`):
+
+| File | Points to |
+|------|-----------|
+| `DBConnection.ini` | Dev Local |
+| `CloudConnection.ini` | Test Cloud |
+
+```cmd
+SB.SyncAgent.exe /encrypt DBConnection.ini "Data Source=DEV_PC\INSTANCE;Initial Catalog=SB2;User Id=sa;Password=***;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;"
+SB.SyncAgent.exe /encrypt CloudConnection.ini "Data Source=TEST_CLOUD_HOST;Initial Catalog=TEST_DB;User Id=***;Password=***;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;"
+```
+
+Confirm SB2 WinForms uses the **same RC4 key** as the agent (`27042005` in SB).
+
+### B. DEV LOCAL scripts (before Test Cloud restore)
+
+Order (or run `docs/sql/SB2_Run_LocalBootstrap.ps1` with **Dev** `-Server`/`-Database`):
+
+1. `DataSync_01_Schema.sql`
+2. `DataSync_04_SoftDelete_Migration.sql`
+3. `DataSync_10_SyncApply_Generic.sql` — require marker `hardDeleteDetail`
+4. `DataSync_03_ApplyInbound.sql` (if present)
+5. `DataSync_11_AllTables_Install.sql` + `DataSync_11_RunLocal.sql` (`InstallCapture=1`)
+6. `DataSync_14_MasterPriority.sql`
+7. `DataSync_15_ERPTransactionTables.sql` (if applicable)
+8. `Deploy_TxnDetail_HardDeleteSync_LOCAL.sql`
+9. `Deploy_EditDeleteSync_LOCAL.sql`
+10. UserRights / menus / reports:
+   - `Update_AllowDelete_AdminUsers_MenuID2.sql` (adjust UserIDs for SB2)
+   - `DataSync_UserRights_L2C_Only_Local.sql`
+   - report grants / clones as in SB `README_Users14_16_RunPack.md` / `README_UserEntryRights_Deploy.md`
+   - `Fix_Duplicate_UserRights_BothSides.sql` if duplicates appear
+
+Local guards in scripts: abort if DB name looks like production Cloud.  
+For Dev: allow Dev DB name (e.g. `SB2`); reject live warehouse names.
+
+### C. Backup → Test Cloud restore
+
+1. Full backup of **Dev Local** after B succeeds.
+2. Restore onto **Test Cloud** host only (never production cloud).
+3. Fix logical file names / paths per host.
+4. Smoke: `SELECT DB_NAME(); SELECT TOP 1 * FROM dbo.SyncConfig;`
+
+### D. TEST CLOUD-only scripts (after restore)
+
+Or run `docs/sql/SB2_Run_CloudAfterRestore.ps1` against **Test Cloud** (+ `-EnableTxnC2L` if needed):
+
+1. Re-apply `DataSync_10_SyncApply_Generic.sql` if backup predates latest Generic.
+2. `DataSync_28_EnableC2L_Capture.sql`
+3. Enable C2L only for tables that Cloud may edit (do **not** turn CaptureLocal=1 on Cloud).
+4. `Deploy_TxnDetail_HardDeleteSync_CLOUD.sql`
+5. `Deploy_EditDeleteSync_CLOUD.sql`
+6. `DataSync_UserRights_L2C_Only.sql` on Cloud
+7. Optional: Sale/Purchase/Transfer C2L packs from SB (`DataSync_32/35/36…`) if SB2 needs same bidirectional txn edits
+
+Cloud note: after Local→Cloud restore the catalog name may still be `SB2`.  
+Do **not** rely on `DB_NAME()='SB2'` alone to detect Local. Prefer: run Cloud scripts only while connected to the Test Cloud server, or set a deploy marker / use distinct Cloud DB name.
+
+### E. Agent + Tray on DEV PC only
+
+1. Build Release SyncAgent + SyncStatus.
+2. Copy into **Dev** ERP/test folder (not Client PC).
+3. Encrypt ini files for Dev Local + Test Cloud (Phase A).
+4. `SyncAgent.exe /once` (or `/test`).
+5. Optional: install Windows service with a **Dev-specific** name.
+6. Start tray; confirm Pending drains Dev↔Test Cloud.
+
+### F. Acceptance (Dev↔Test)
+
+Use `docs/SB2_DEV_TEST_RESULTS.template.md`.
+
+Also complete **History ListView** port (`docs/SB2_HistoryListView_Port.md`) on Dev PC:
+footer summary + Spring, progress bar, MultiSelect, column width/format, FastListViewHelper.
+H1–H8 must PASS.
+
+When sync + History checklists are PASS → **STOP** and ask before Live/Client cutover.
+
+---
+
+## UserRights / menu / report parity
+
+Policy copied from SB:
+
+| Item | Rule |
+|------|------|
+| Direction | **L2C only** (`CaptureLocal=1` Local, `CaptureCloud=0` both) |
+| Entry Delete | `AllowDelete=1` only for admin UserIDs (SB: 1,2,3,4,5,8 — retarget for SB2) |
+| Entry Edit | `AllowEdit=0` → readonly+Print; Save gated by LogDay/AllowBackDate when Edit=1 |
+| Reports | Grant/clone scripts under `docs/sql/Grant_*` / `Clone_UserRights_*` |
+| App code | Port `UserEntryRights` + form Save gates if SB2 WinForms fork diverged |
+
+---
+
+## File map to copy into SB2
+
+Minimum copy set:
+
+```text
+SB.SyncAgent/          (or rename)
+SB.SyncStatus/
+SB/FastListViewHelper.cs          # recover if missing — required
+SB/frm_Main.cs + .Designer.cs     # history bind, footer, progress, columns
+SB/frm_List.cs (+ related list forms using helper)
+lib/ObjectListView.dll            # or packages path; fix csproj HintPath
+docs/sql/DataSync_01_Schema.sql
+docs/sql/DataSync_04_SoftDelete_Migration.sql
+docs/sql/DataSync_10_SyncApply_Generic.sql
+docs/sql/DataSync_11_*.sql
+docs/sql/DataSync_14_MasterPriority.sql
+docs/sql/DataSync_15_ERPTransactionTables.sql
+docs/sql/DataSync_28_EnableC2L_Capture.sql
+docs/sql/DataSync_UserRights_L2C_Only.sql
+docs/sql/DataSync_UserRights_L2C_Only_Local.sql
+docs/sql/Deploy_TxnDetail_HardDeleteSync_*.sql
+docs/sql/Deploy_EditDeleteSync_*.sql
+docs/sql/Update_AllowDelete_AdminUsers_MenuID2.sql
+docs/sql/Sales_Listview_NarrowCarDiscount.sql
+docs/sql/README_UserEntryRights_Deploy.md
+docs/SB2_PORT_PROMPT.md
+docs/SB2_Agent_Prompt_Short.md
+docs/SB2_Sync_Bootstrap_Playbook.md
+docs/SB2_HistoryListView_Port.md
+docs/SB2_DEV_TEST_RESULTS.template.md
+docs/config/SB2_CONNECTIONS.template.md
+docs/sql/SB2_Run_LocalBootstrap.ps1
+docs/sql/SB2_Run_CloudAfterRestore.ps1
+```
+
+Optional later: C2L txn packs, ghost cleanups, purchase/sale diagnose scripts.
+
+---
+
+## Common mistakes
+
+| Mistake | Result |
+|---------|--------|
+| Run Cloud C2L install on Local | Wrong-direction outbox / broken L2C |
+| Skip Local-first restore | Cloud missing columns → apply failures |
+| UserRights C2L left on | Rights fight / flicker |
+| Detail apply without `@Operation` | Delete syncs as soft ghost |
+| Wrong ini / RC4 key | Agent cannot open DB |
+| Commit real passwords | Security incident |
+| Skip `FastListViewHelper` / ObjectListView | History bind crashes or falls back to slow ListView |
+| No status-strip Spring | Footer totals clipped off-screen |
+| MultiSelect left false | Cannot multi-select history rows |
+| Skip Sales ListviewItem width SQL | Charges/Amount columns crushed |
+
+---
+
+## After SB2 goes live
+
+1. Fill actual server names into playbook “as deployed” section.
+2. Keep SB and SB2 script fixes in sync when fixing Detail/Head delete bugs.
+3. Prefer shared `docs/sql` changes upstreamed to both repos.
