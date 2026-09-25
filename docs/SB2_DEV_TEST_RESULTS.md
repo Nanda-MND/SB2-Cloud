@@ -50,4 +50,6 @@ SyncAgent and SyncStatus stay on the existing .NET Framework projects. The Dev s
 
 Dev/Test runtime sign-off is not granted. BLOCKED rows must be run on the Dev PC against Dev Local and Test Cloud before any Live/Client cutover plan.
 
+Follow-up after Dev PC build `d90aa3e`: `Install-SyncStatus.cmd` no longer uses `set /p` inside parentheses, so cmd.exe does not stop with `: was unexpected at this time.` Assert scripts now say to run `SB2_Run_LocalBootstrap.ps1` first when `SyncConfig` is missing. Runners still pass `sqlcmd -v Role=Local` and `Role=TestCloud`. Connection placeholders, encrypted ini, bootstrap, Test Cloud, and H1-H8 stay BLOCKED until the Dev PC supplies runtime passwords outside git.
+
 **Next:** ask before any Live DB or Client PC cutover document or deploy.

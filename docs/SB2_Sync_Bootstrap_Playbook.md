@@ -35,6 +35,14 @@ Runners:
 
 Older `docs/sql/Deploy-*.cmd` launchers that pointed at SB1 or the production cloud host now exit through `SB2_RefuseLive.cmd`.
 
+Assert scripts are not the first step. On a new `SB2` database, `dbo.SyncConfig` does not exist yet.
+
+1. Run `SB2_Run_LocalBootstrap.ps1`. It installs sync, then calls `SB2_Assert_DetailHardDelete.sql` and `SB2_Assert_UserRights_L2C.sql` with `sqlcmd -v Role=Local`.
+2. Backup, restore onto Test Cloud, then run `SB2_Run_CloudAfterRestore.ps1`. That runner calls the UserRights assert with `sqlcmd -v Role=TestCloud`.
+3. Do not run the assert files alone before bootstrap. A direct `sqlcmd` without `-v Role=` warns that the scripting variable is not defined.
+
+Passwords stay in `SB2_DEV_LOCAL_SQL_PASSWORD` and `SB2_TEST_CLOUD_SQL_PASSWORD`. Do not commit them. Placeholders in `docs/config/SB2_CONNECTIONS.md` stay placeholders.
+
 ## Source of truth (reference SB repo — copy from, do not edit for this port)
 
 | Area | Where in SB |

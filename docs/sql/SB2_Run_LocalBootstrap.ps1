@@ -74,6 +74,7 @@ foreach ($name in $forbiddenHere) {
 
 Write-Host "Dev Local bootstrap on $Server / $Database"
 Write-Host 'UserRights L2C-only. Detail Op=D = hard delete.'
+Write-Host 'Asserts run only after bootstrap, with sqlcmd -v Role=Local.'
 
 Invoke-Sb2SqlFiles -Server $Server -Database $Database -User $User -Password $Password -SqlDir $PSScriptRoot -Files $required
 Invoke-Sb2SqlFile -Server $Server -Database $Database -User $User -Password $Password `

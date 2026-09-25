@@ -2,3 +2,7 @@
 *.ini
 *.bak
 *.zip
+
+# Dev PC build outputs. Do not commit Release artifacts from a test run.
+[Bb]in/
+[Oo]bj/

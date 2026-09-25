@@ -69,6 +69,7 @@ foreach ($name in $scripts) {
 
 Write-Host "Test Cloud after-restore on $Server / $Database"
 Write-Host 'UserRights L2C-only. Detail Op=D = hard delete. Local capture is not installed here.'
+Write-Host 'UserRights assert uses sqlcmd -v Role=TestCloud.'
 
 Invoke-Sb2SqlFiles -Server $Server -Database $Database -User $User -Password $Password -SqlDir $PSScriptRoot -Files $scripts
 Invoke-Sb2SqlFile -Server $Server -Database $Database -User $User -Password $Password `
