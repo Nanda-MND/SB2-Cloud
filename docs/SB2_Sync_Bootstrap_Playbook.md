@@ -11,6 +11,30 @@ Port **SB** Local↔Cloud sync (L2C / C2L) + **SyncAgent** + **Tray (SyncStatus)
 | Forbidden (until Dev green) | Live/production DB, Client PC ERP folder, live SyncAgent on customer PCs |
 | Cutover | Separate task after `docs/SB2_DEV_TEST_RESULTS.md` is green |
 
+## DEV / TEST names (this phase)
+
+Filled from `docs/config/SB2_CONNECTIONS.md`. Passwords are not in git.
+
+| Key | Value |
+|-----|-------|
+| Environment | `DEV_TEST` |
+| Dev Local | `YOUR_DEV_PC\INSTANCE` / database `SB2` / user `sa` |
+| Test Cloud | `YOUR_TEST_CLOUD_HOST` / `YOUR_TEST_CLOUD_DB` / `YOUR_TEST_CLOUD_USER` |
+| ERP / test folder | `D:\Dev\SB2-Cloud\` |
+| Windows service | `SB2.SyncAgent.Dev` |
+| RC4 EncryptKey | `27042005` |
+| Refused | SB1, `SQL1002.site4now.net`, `db_abbe78_warehouse`, client folder `D:\MinnNandar\Software` |
+
+Runners:
+
+1. `docs/sql/SB2_Run_LocalBootstrap.ps1` — Dev Local. UserRights L2C-only. Detail Op=D hard delete.
+2. `docs/sql/SB2_Run_Backup.ps1` — COPY_ONLY backup of Dev Local.
+3. `docs/sql/SB2_Run_TestCloudRestore.ps1` — restore that `.bak` onto Test Cloud only.
+4. `docs/sql/SB2_Run_CloudAfterRestore.ps1` — Test Cloud scripts. Does not install Local capture.
+5. `SB.SyncAgent/SB2_Dev_EncryptAndOnce.ps1` — encrypt Dev/Test ini, `/once`, optional service `SB2.SyncAgent.Dev`.
+
+Older `docs/sql/Deploy-*.cmd` launchers that pointed at SB1 or the production cloud host now exit through `SB2_RefuseLive.cmd`.
+
 ## Source of truth (reference SB repo — copy from, do not edit for this port)
 
 | Area | Where in SB |
@@ -227,6 +251,8 @@ Optional later: C2L txn packs, ghost cleanups, purchase/sale diagnose scripts.
 
 ## After SB2 goes live
 
-1. Fill actual server names into playbook “as deployed” section.
+Do not fill live server names in this phase. Live/Client cutover is a separate task and is not approved.
+
+1. After that cutover is approved, fill actual server names into an “as deployed” section.
 2. Keep SB and SB2 script fixes in sync when fixing Detail/Head delete bugs.
 3. Prefer shared `docs/sql` changes upstreamed to both repos.

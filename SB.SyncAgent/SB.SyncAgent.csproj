@@ -37,6 +37,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConnectionIni.cs" />
+    <Compile Include="DevTestGuard.cs" />
     <Compile Include="ConnectionTest.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="ProjectInstaller.cs">

@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM Full DB sync — Local seed + service start helper (client PC).
 set SCRIPTDIR=%~dp0
 cd /d "%SCRIPTDIR%"

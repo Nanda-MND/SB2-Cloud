@@ -41,6 +41,9 @@
     <Compile Include="..\SB.SyncAgent\ConnectionIni.cs">
       <Link>Shared\ConnectionIni.cs</Link>
     </Compile>
+    <Compile Include="..\SB.SyncAgent\DevTestGuard.cs">
+      <Link>Shared\DevTestGuard.cs</Link>
+    </Compile>
     <Compile Include="..\SB.SyncAgent\RC4Engine.cs">
       <Link>Shared\RC4Engine.cs</Link>
     </Compile>

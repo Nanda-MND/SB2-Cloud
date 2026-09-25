@@ -10,7 +10,7 @@ namespace SB.SyncAgent
 
         public SyncAgentService()
         {
-            ServiceName = "SB.SyncAgent";
+            ServiceName = "SB2.SyncAgent.Dev";
             CanStop = true;
             CanPauseAndContinue = false;
             AutoLog = true;

@@ -16,9 +16,8 @@ echo.
 echo Built: %~dp0bin\Release\SB.SyncAgent.exe
 dir "%~dp0bin\Release\SB.SyncAgent.exe"
 echo.
-echo Copy to ERP folder, then:
-echo   net stop SB.SyncAgent
-echo   copy /Y bin\Release\SB.SyncAgent.exe D:\MinnNandar\Software\
-echo   net start SB.SyncAgent
-echo   SB.SyncAgent.exe /test
-pause
+echo Dev PC only. ERP folder: D:\Dev\SB2-Cloud\
+echo Service name: SB2.SyncAgent.Dev
+echo Do not copy to a client PC or start SB.SyncAgent.
+echo Next: powershell -File SB2_Dev_EncryptAndOnce.ps1
+exit /b 0

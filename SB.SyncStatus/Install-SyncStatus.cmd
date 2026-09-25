@@ -4,7 +4,7 @@ REM Do NOT copy this to other client PCs.
 
 setlocal
 set SRC=%~dp0bin\Release\SB.SyncStatus.exe
-set ERP=D:\MinnNandar\Software
+set ERP=D:\Dev\SB2-Cloud
 
 if not exist "%SRC%" (
   echo Build first: Build-SyncStatus.cmd
@@ -20,10 +20,19 @@ if not exist "%ERP%\DBConnection.ini" (
   set /p ERP=ERP folder (must contain DBConnection.ini): 
 )
 
+echo %ERP% | findstr /I "MinnNandar site4now" >nul
+if not errorlevel 1 (
+  echo Refusing live/client ERP folder:
+  echo   %ERP%
+  echo Use D:\Dev\SB2-Cloud\
+  pause
+  exit /b 1
+)
+
 if not exist "%ERP%\DBConnection.ini" (
   echo Missing DBConnection.ini in:
   echo   %ERP%
-  echo Put SB.SyncStatus.exe next to SB.exe / DBConnection.ini
+  echo Encrypt Dev/Test ini with SB.SyncAgent\SB2_Dev_EncryptAndOnce.ps1
   pause
   exit /b 1
 )

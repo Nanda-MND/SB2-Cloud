@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM Option C — Cloud: C2L master data only (disable transaction C2L)
 
 set SERVER=SQL1002.site4now.net

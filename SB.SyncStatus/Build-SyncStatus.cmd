@@ -25,5 +25,6 @@ echo.
 echo Built: %~dp0bin\Release\SB.SyncStatus.exe
 dir "%~dp0bin\Release\SB.SyncStatus.exe"
 echo.
-echo Next: run Install-SyncStatus.cmd on the Local Server PC only.
+echo Dev PC only. ERP folder: D:\Dev\SB2-Cloud\
+echo Next: Install-SyncStatus.cmd  (refuses client/live folders)
 exit /b 0

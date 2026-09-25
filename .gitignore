@@ -1,0 +1,4 @@
+# Connection files and backups can hold secrets. Do not commit them.
+*.ini
+*.bak
+*.zip

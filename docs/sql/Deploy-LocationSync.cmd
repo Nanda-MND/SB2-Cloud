@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM Enable Location sync on Local + Cloud.
 
 set LOCAL_SERVER=Server\SB1

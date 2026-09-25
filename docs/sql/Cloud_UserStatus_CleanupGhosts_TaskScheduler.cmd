@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM ============================================================================
 REM Cloud UserStatus ghost cleanup — no msdb / no SQL Agent
 REM ============================================================================

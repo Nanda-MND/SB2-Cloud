@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM Run ALL required Cloud sync scripts (receive-only side).
 REM Does NOT install Local capture triggers.
 
