@@ -374,6 +374,9 @@
     <None Include="Resources\delete %285%29.png" />
     <None Include="Resources\data-entry.png" />
     <Content Include="SB-Logo.ico" />
+    <Content Include="Reports\*.rpt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
