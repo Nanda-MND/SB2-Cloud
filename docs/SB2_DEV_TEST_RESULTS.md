@@ -46,4 +46,4 @@ Post-fix scripts 1–3 (Backup, CloudAfterRestore, EncryptAndOnce) PASS on Dev P
 
 Passwords and `*.ini` / `*.bak` stay out of git. Service `SB.SyncAgent.Dev` was not installed (`-InstallService` not used).
 
-**Next:** Human or GUI-capable agent runs H1–H8 on `D:\Dev\SB2-Cloud-Runtime\SB.exe`. Ask before any Live DB or Client PC cutover.
+**Next:** Open `SB.sln`, set startup project `SB`, press F5, and run H1–H8 on that window (Sales, Cashbook, Balance). Do not replace `SB\bin\Debug` with SB2-git output. H1–H8 stay BLOCKED until that GUI run. Ask before any Live DB or Client PC cutover.

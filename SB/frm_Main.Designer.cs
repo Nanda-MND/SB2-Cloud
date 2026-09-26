@@ -152,6 +152,7 @@ namespace SB
 
             this.tsslSpring.Name = "tsslSpring";
             this.tsslSpring.Spring = true;
+            this.tsslSpring.AutoSize = false;
             this.tsslSpring.Text = string.Empty;
 
             this.tslbTotalAmount.Name = "tslbTotalAmount";
@@ -192,7 +193,7 @@ namespace SB
             this.MinimumSize = new Size(1024, 600);
             this.Name = "frm_Main";
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Text = "SB2 History";
+            this.Text = "SB";
             this.Shown += frm_Main_Shown;
             this.Controls.Add(this.dlvHistory);
             this.Controls.Add(this.panelTop);

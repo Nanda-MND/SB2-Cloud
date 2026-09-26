@@ -7,9 +7,18 @@ Port **SB** Local↔Cloud sync (L2C / C2L) + **SyncAgent** + **Tray (SyncStatus)
 | Rule | Detail |
 |------|--------|
 | New repo | Work in **`SB2-Cloud`** — do **not** change live **SB** production repo |
+| SB2-git | Read-only reference (`D:\Project\SB2-git`, `Nanda-MND/SB2.git`). Do not commit, push, or edit it. Do not delete or recreate the SB2-Cloud folder from it. |
 | First target | **Dev PC Local SQL** + **Test Cloud** only |
 | Forbidden (until Dev green) | Live/production DB, Client PC ERP folder, live SyncAgent on customer PCs |
 | Cutover | Separate task after `docs/SB2_DEV_TEST_RESULTS.md` is green |
+
+## Open the app (Dev PC)
+
+Open `SB.sln` in Visual Studio. The solution contains `SB`, `SB.SyncAgent`, and `SB.SyncStatus`. Set **SB** as the startup project and press F5 (Debug). The history window title is `SB`. Menus `Sales`, `Cashbook`, and `Balance` exercise H1–H8 on the recovered history list.
+
+Build output is `SB\bin\Debug\SB.exe`. That folder is gitignored. Do not replace it with `D:\Project\SB2-git\SB\Bin\Debug`. This sandbox does not edit SB2-git.
+
+`DBConnection.ini` is not in git. Sync still uses `D:\Dev\SB2-Cloud-Runtime\` via `SB2_Dev_EncryptAndOnce.ps1`.
 
 ## DEV / TEST names (this phase)
 
@@ -208,6 +217,7 @@ Policy copied from SB:
 Minimum copy set:
 
 ```text
+SB.sln                            # Visual Studio: SB, SB.SyncAgent, SB.SyncStatus
 SB.SyncAgent/          (or rename)
 SB.SyncStatus/
 SB/FastListViewHelper.cs          # recover if missing — required

@@ -226,6 +226,9 @@ namespace SB
             tspbHistoryLoad.Value = 0;
             tspbHistoryLoad.Style = ProgressBarStyle.Continuous;
             tspbHistoryLoad.Visible = true;
+            statusStrip1.Refresh();
+            // Sample binds finish in one turn. Let the bar paint before the fill continues.
+            Application.DoEvents();
         }
 
         private void SetHistoryLoadProgress(int percent)
@@ -241,8 +244,11 @@ namespace SB
 
         private void EndHistoryLoadProgress()
         {
+            tspbHistoryLoad.Value = tspbHistoryLoad.Maximum;
+            statusStrip1.Refresh();
             tspbHistoryLoad.Value = 0;
             tspbHistoryLoad.Visible = false;
+            statusStrip1.Refresh();
         }
 
         private void UpdateSelectionCommands()

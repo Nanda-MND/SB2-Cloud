@@ -73,6 +73,14 @@ SB Main history (`dlvHistory` / FastObjectListView) was upgraded for:
 - [ ] Filter typing combos still work (`DropDown` style) without regressing ListView bind
 - [ ] Menu switch feels fast (no full grid recreate when layout cache allows)
 
+## How Tester opens it
+
+1. Pull `cursor/sb2-dev-test-bootstrap-9fc4`.
+2. Open `SB.sln`. Startup project is `SB`.
+3. F5. Use menus Sales, Cashbook, and Balance.
+4. Do not copy `SB2-git` `Bin\Debug` over `SB\bin\Debug`.
+5. Mark H1–H8 only after that window is used. Code inspection is not PASS.
+
 ## Dev / Test verification (add to `SB2_DEV_TEST_RESULTS`)
 
 | # | Test | Expect |

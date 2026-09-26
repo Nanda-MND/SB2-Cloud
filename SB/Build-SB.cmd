@@ -17,7 +17,9 @@ if errorlevel 1 (
 )
 
 echo Built: %~dp0bin\Release\SB.exe
+echo Visual Studio: open SB.sln at the repo root and start project SB.
 echo ObjectListView hint path: lib\ObjectListView.dll
-echo Dev ERP runtime folder, if you copy it: D:\Dev\SB2-Cloud-Runtime\ (no .git)
+echo Dev ERP runtime folder, if you copy the agent: D:\Dev\SB2-Cloud-Runtime\ (no .git)
+echo Do not replace SB\bin with D:\Project\SB2-git\SB\Bin\Debug.
 echo Do not copy this build to a client PC.
 exit /b 0

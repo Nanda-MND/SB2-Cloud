@@ -396,7 +396,7 @@ namespace SB
             if (column == null)
                 return;
             column.Width = width;
-            column.MinimumWidth = Math.Min(width, 40);
+            column.MinimumWidth = width;
         }
 
         public static void EnsureColumn(ObjectListView list, string columnName, string header, int width, string afterColumn)

@@ -67,8 +67,10 @@ SSMS smoke on Test Cloud must use database `db_abe8c0_sb2`, not `master`.
 
 | Field | Value |
 |-------|-------|
+| Visual Studio solution | `SB.sln` (startup project `SB`) |
+| History exe | `SB\bin\Debug\SB.exe` after F5. Do not replace this folder from SB2-git. |
 | ERP / runtime folder | `D:\Dev\SB2-Cloud-Runtime\` |
-| Git checkout (do not write ini here) | `D:\Dev\SB2-Cloud\` |
+| Git checkout (do not write ini here) | `D:\Dev\SB2-Cloud\` or `D:\Project\SB2-Cloud\` |
 | SyncAgent exe | `SB.SyncAgent.exe` |
 | Tray exe | `SB.SyncStatus.exe` |
 | RC4 EncryptKey | `27042005` |
