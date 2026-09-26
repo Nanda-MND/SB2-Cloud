@@ -1,9 +1,9 @@
 # SB2-Cloud Dev / Test acceptance results
 
 Date: 2026-09-26 (Asia/Rangoon)
-HEAD: `de9e029f2e5e8ed9d369d232743c0e9b0b7e557d` (`de9e029`; de9e029 ancestor: yes; 4424b69 ancestor: yes)
+HEAD: `005baafe4ccc6df62a2dc49e0c2c34fc91ac4f7b` (`005baaf`; merge-base --is-ancestor 005baaf HEAD: yes; 4424b69 ancestor: yes)
 Branch: `cursor/sb2-dev-test-bootstrap-9fc4`
-Environment: Dev PC Tester after `de9e029`. Live/Client cutover was not started.
+ERP copy: `005baaf` WinForms import (`frm_Sales.cs` present). Live/Client cutover was not started.
 
 ALREADY PASS at 4424b69 (not re-done this run):
 - Local bootstrap on `SB2`
@@ -13,7 +13,7 @@ ALREADY PASS at 4424b69 (not re-done this run):
 | # | Test | Expect | Result | Notes |
 |---|------|--------|--------|-------|
 | 1 | Environment | Only Dev Local + Test Cloud used | PASS | Dev Local `localhost` / `SB2` / `sa`. Test Cloud `sql8006.site4now.net` / `db_abe8c0_sb2`. Forbidden hosts/DBs not used. |
-| 2 | Repo | Work done in SB2-Cloud, not live SB | PASS | Branch `cursor/sb2-dev-test-bootstrap-9fc4` at `de9e029`. Remote `Nanda-MND/SB2-Cloud.git`. |
+| 2 | Repo | Work done in SB2-Cloud, not live SB | PASS | Branch `cursor/sb2-dev-test-bootstrap-9fc4` at `005baaf`. Remote `Nanda-MND/SB2-Cloud.git`. |
 | 3 | Local bootstrap | DataSync + Detail/Head packs + UserRights Local OK | PASS | Already PASS at 4424b69 (not re-done). |
 | 4 | Backup | `SB2_Run_Backup.ps1` exit 0, bak exists Length>0 | PASS | Already PASS at 4424b69 (not re-done). |
 | 5 | Cloud after-restore | Exit 0 + OK UserRights L2C-only (TestCloud) | PASS | Already PASS at 4424b69 (not re-done). |
@@ -24,32 +24,41 @@ ALREADY PASS at 4424b69 (not re-done this run):
 | 10 | Head soft-delete | Dev soft-delete -> Test Cloud stays deleted | BLOCKED | Not exercised. |
 | 11 | UserRights | Dev change -> Test Cloud; no C2L fight | BLOCKED | Not exercised this run. |
 | 12 | Offline Dev | ERP works; outbox drains later | BLOCKED | Not exercised. |
-| 13 | History progress | tspbHistoryLoad shows then hides on fill | PASS | See H1. |
-| 14 | History footer | Totals/Paid/PK/Bank Charges correct; Spring keeps totals visible | PASS | See H2/H3. |
-| 15 | History MultiSelect | Ctrl/Shift multi-row select stable | PASS | See H4. |
-| 16 | History columns | Sales Charges + narrow Car/Discount; cashbook/balance layouts OK | PASS | See H5-H7. |
-| 17 | History menu switch | Rapid menu change — no wrong columns / no crash | PASS | See H8. |
-| S1 | Solution opens / SB builds | `SB.sln` lists SB, SB.SyncAgent, SB.SyncStatus; Debug AnyCPU build exit 0; `SB\bin\Debug\SB.exe` exists | PASS | `SB.sln` projects confirmed. MSBuild VS2022 Enterprise exit 0. `D:\Project\SB2-Cloud\SB\bin\Debug\SB.exe` Length=31232 LastWriteTime=2026-09-26 13:16:56 +06:30 (built this run; not copied from SB2-git). |
+| 13 | History progress | tspbHistoryLoad shows then hides on fill | FAIL | See H1. Source has no `tspbHistoryLoad`; runtime not reachable. |
+| 14 | History footer | Totals/Paid/PK/Bank Charges; Spring keeps visible | BLOCKED | See H2/H3. Cannot observe on running new frm_Main (build FAIL). |
+| 15 | History MultiSelect | Ctrl/Shift multi-row select stable | FAIL | See H4. Designer sets `dlvHistory.MultiSelect = false`. |
+| 16 | History columns | Sales Charges + narrow Car/Discount; Amount not crushed | BLOCKED | See H5. Source has Charges/Car wiring; runtime not reachable. |
+| 17 | History menu switch | Rapid menu change — no wrong columns / no crash | BLOCKED | Not run (no exe). |
+| S1 | Solution opens / SB builds | `SB.sln` Debug AnyCPU build exit 0; real `SB.exe` >> 31KB stub | FAIL | MSBuild VS2022 Enterprise exit 1. HintPath `..\..\777\777\bin\Debug\ObjectListView.dll` → `D:\Project\777\777\bin\Debug\ObjectListView.dll` missing. MSB3245 Could not resolve ObjectListView. CS0246 BrightIdeasSoftware in frm_Main / frm_Setup / frm_CodeList. Per lock: did NOT copy ObjectListView into repo (not from SB2-git either). After failed Rebuild, `SB\bin\Debug\SB.exe` is absent (prior 31232-byte stub removed by rebuild). |
 
-## History checks H1-H8
+## Build / login (this run at 005baaf)
 
-Driven via UIAutomation + SendKeys on Dev PC (process title `SB`, PID probe). Not code-inspection PASS.
+| Step | Result | Evidence |
+|------|--------|----------|
+| Pull / ancestor | PASS | `git pull` up to date; HEAD `005baafe4ccc6df62a2dc49e0c2c34fc91ac4f7b`; `merge-base --is-ancestor 005baaf HEAD` exit 0; `Test-Path SB\frm_Sales.cs` True |
+| S1 Build Debug AnyCPU | FAIL | `MSBuild SB.sln /p:Configuration=Debug /p:Platform="Any CPU" /t:Rebuild` exit 1. Primary error: missing ObjectListView at HintPath (see S1 notes). SyncAgent/SyncStatus built; SB project did not. |
+| Login frm_Login | BLOCKED | No buildable `SB.exe` from this import. `Program.cs` does `Application.Run(new frm_Login())` in source, but first-window / login UI not observed. Did not write ini into git checkout; did not point at live server. |
+| Main ERP after login | BLOCKED | Depends on successful login. |
+
+## History checks (NEW frm_Main only — do not reuse sample-app H1–H8 PASS)
+
+PASS only if observed on new frm_Main after login. This run: build FAIL → no runtime. Source inspected for evidence only.
 
 | # | Test | Expect | Result | Notes |
 |---|------|--------|--------|-------|
-| H1 | Open Sales history | Progress bar shows then hides; rows bind | PASS | `SB.exe` started WD `SB\bin\Debug`; title `SB`. Sales MenuValue=Sales; ListView ItemCount=3; footer totals present. After load and after Reload click, no ProgressBar node in UIA (ToolStripProgressBar not exposed); idle has no progress (hide OK). Rows rebound ItemCount=3 after Reload. |
-| H2 | Footer | Total / Paid / PK / Bank Charges correct vs data | PASS | StatusStrip observed: Total Amount: 165,000; Paid: 70,000; PK: 07; Bank Charges: 451 (Sales). Values present and labeled; not re-summed against raw SQL this run. |
-| H3 | Resize Main | Footer totals still visible (Spring) | PASS | MoveWindow to 1100x700 then 1400x850; footer labels Total/Paid/PK/Bank Charges remained visible both sizes. |
-| H4 | Multi-select | Ctrl/Shift select multiple rows; UI stable | PASS | Ctrl+A SelectedCount=3/3; Ctrl+click two rows SelectedCount=2; process Responding=True HasExited=False. |
-| H5 | Sales columns | Charges visible; Car/Discount narrow; Amount not crushed | PASS | Runtime 9 cols widths 100,90,100,55,70,70,70,40,110 (narrow 55/40; Amount-ish 110). Dev Local `ListViewItem` Sales includes Car W=55, PK W=40, Charges/Bank Charges W=70. LVM column text empty (ObjectListView); widths + DB confirm layout. |
-| H6 | Balance menu | Sort/layout OK; Total Closing footer OK | PASS | Menu=Balance; status Total Closing: 5,650; ItemCount=3 ColCount=6; distinct layout vs Sales. |
-| H7 | Cashbook menu | Cashbook column defaults applied | PASS | Menu=Cashbook; status Income: 80,000 Expense: 15,000; ItemCount=2 ColCount=9; widths differ from Sales (e.g. 160/60/90). |
-| H8 | Switch menus rapidly | No wrong columns / no crash / progress ends cleanly | PASS | 7 rapid Sales/Cashbook/Balance switches; each landed correct MenuValue + matching footer; crash=False; process Alive title SB. |
+| H1 | tspbHistoryLoad | Progress bar shows then hides while history loads | FAIL | `findstr tspb` / `tspbHistoryLoad` across `SB\*.cs`: no matches. No ToolStripProgressBar in `frm_Main.Designer.cs`. Not observed at runtime. |
+| H2 | Footer Totals/Paid/PK/Bank Charges | Labels correct vs data | BLOCKED | Source has `ShowTotalAmount`, `tslbMachine` / `tsLabelPaid` / `tsLabelBankCharges` and comment "Keep PK / Paid / Bank Charges / Total Amount visible". Not observed on running UI. |
+| H3 | Resize Main / Spring | Footer totals still visible | BLOCKED | Source: `tssLeft.Spring = true` (frm_Main.Designer.cs:206). Not observed after resize on running new frm_Main. |
+| H4 | MultiSelect | `dlvHistory.MultiSelect` true; Ctrl/Shift works | FAIL | `frm_Main.Designer.cs:1520`: `this.dlvHistory.MultiSelect = false;` also `SelectAllOnControlA = false`. Runtime multi-select not tested. |
+| H5 | Sales columns | Charges visible; Car/Discount narrow; Amount not crushed | BLOCKED | Source: SaleHistory dcol includes Car + Charges; Charges→"Bank Charges" width floor 110; FAmount labeled Amount. `Discount` string not found in frm_Main.cs. Runtime column widths not observed. |
+| H6 | Balance menu | Sort/layout OK | BLOCKED | Not run. |
+| H7 | Cashbook menu | Cashbook column defaults | BLOCKED | Not run. |
+| H8 | Switch menus rapidly | No wrong columns / crash | BLOCKED | Not run. |
 
 ## Sign-off
 
-Solution build S1 PASS. H1-H8 PASS via live GUI automation on Dev PC at `de9e029`. Prior bootstrap/backup/cloud/once rows remain PASS from 4424b69 (not re-done). Live/Client cutover was not opened.
+S1 Build **FAIL** (ObjectListView HintPath missing; DLL not copied into repo). Login and history runtime checks **BLOCKED** / **FAIL** as above. Prior bootstrap/backup/cloud/once rows remain PASS from 4424b69 (not re-done). Old sample-app H1–H8 PASS values were **not** carried forward. Live/Client cutover was not opened.
 
-Passwords and `*.ini` / `*.bak` stay out of git. Service `SB.SyncAgent` was not installed. Working tree bin/obj dirt left uncommitted.
+Passwords and `*.ini` / `*.bak` stay out of git. Working tree bin/obj dirt left uncommitted.
 
-**Next:** Optional human eyeball of Charges header text and progress bar animation (UIA cannot see ToolStripProgressBar). Ask before any Live DB or Client PC cutover.
+**Next:** Place `ObjectListView.dll` at the HintPath outside the repo (or change HintPath via a committed csproj fix), rebuild, then re-run login + history on new frm_Main. Ask before any Live DB or Client PC cutover.
