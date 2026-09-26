@@ -41,8 +41,9 @@ Runners:
 1. `docs/sql/SB2_Run_LocalBootstrap.ps1` — Dev Local. UserRights L2C-only. Detail Op=D hard delete.
 2. `docs/sql/SB2_Run_Backup.ps1` — COPY_ONLY backup of Dev Local.
 3. `docs/sql/SB2_Run_TestCloudRestore.ps1` — restore that `.bak` onto Test Cloud only.
-4. `docs/sql/SB2_Run_CloudAfterRestore.ps1` — Test Cloud scripts. Does not install Local capture.
-5. `SB.SyncAgent/SB2_Dev_EncryptAndOnce.ps1` — encrypt Dev/Test ini, `/once`, optional service `SB2.SyncAgent.Dev`.
+4. `docs/sql/SB2_Run_CloudAfterRestore.ps1` — Test Cloud scripts. Does not install Local capture. Reseeds cloud transaction identities (including Fix_AllTxn-only tables), turns UserStatus and ListviewItem sync off, and closes restored Cloud L2C outbox copies.
+5. `docs/sql/SB2_Run_LocalPendingFix.ps1` — Local only, when Generic or UserStatus flags need a refresh without a full bootstrap. No identity reseed.
+6. `SB.SyncAgent/SB2_Dev_EncryptAndOnce.ps1` — encrypt Dev/Test ini, `/once`, optional service `SB2.SyncAgent.Dev`.
 
 Older `docs/sql/Deploy-*.cmd` launchers that pointed at SB1 or the production cloud host now exit through `SB2_RefuseLive.cmd`.
 
@@ -172,10 +173,15 @@ Or run `docs/sql/SB2_Run_CloudAfterRestore.ps1` against **Test Cloud** (+ `-Enab
 4. `Deploy_TxnDetail_HardDeleteSync_CLOUD.sql`
 5. `Deploy_EditDeleteSync_CLOUD.sql`
 6. `DataSync_UserRights_L2C_Only.sql` on Cloud
-7. Optional: Sale/Purchase/Transfer C2L packs from SB (`DataSync_32/35/36…`) if SB2 needs same bidirectional txn edits
+7. `Cloud_Reseed_TransactionIdRanges.sql` on Cloud only, then `Fix_AllTxn_Cloud_C2L_Capture.sql` (`CaptureCloud=1`, `CaptureLocal=0`). Reseed floor `2000000000`. Covers every Fix_AllTxn identity table (ReturnReceive, StockOpening, RawIssue, FinishGoods, ReturnStock, GetStock, Account/Customer/Supplier/Manufacturer opening, CustSupTransfer, plus Sale/Purchase/Transfer/Adjustment/StockReceive/IncomeExpense/Journal). Missing tables SKIP. The reseed script aborts if `DB_NAME()` is `SB2`, `SB1`, or `SB`. Never `DBCC CHECKIDENT` Local up to that floor.
+8. `SB2_Disable_UserStatus_And_Listview_Sync.sql` on **both** Local and Cloud. UserStatus: `IsEnabled=0`, `CaptureLocal=0`, `CaptureCloud=0`, Sync triggers dropped, pending outbox removed. `dbo.UserStatus_CleanupGhosts` stays; CloudAfterRestore runs `Cloud_UserStatus_GhostCleanup.sql` after the disable so the proc exists after a fresh restore. ListviewItem is not a sync table (UI widths only). `Users` stays a master (`DataSync_15`). UserRights is unchanged.
+9. `SB2_Close_RestoredCloud_L2C_Outbox.sql` on Cloud only. Restored `Direction=L2C` rows are a copy of Local's queue; the agent never claims them on Cloud. C2L rows stay. Do not run this on Local.
+10. Optional: Sale/Purchase/Transfer C2L packs from SB (`DataSync_32/35/36…`) if SB2 needs same bidirectional txn edits
+
+Head `Op=D` is a soft `IsDeleted` update. Detail `Op=D` is a physical DELETE. Apply compares the primary key with `TRY_CAST` so an int key is not compared to `sql_variant` (that throw left PurchaseHead `Op=D` Pending).
 
 Cloud note: after Local→Cloud restore the catalog name may still be `SB2`.  
-Do **not** rely on `DB_NAME()='SB2'` alone to detect Local. Prefer: run Cloud scripts only while connected to the Test Cloud server, or set a deploy marker / use distinct Cloud DB name.
+Do **not** rely on `DB_NAME()='SB2'` alone to detect Local. This phase restores onto `db_abe8c0_sb2`. The reseed and L2C-close scripts abort when the catalog is `SB2` so a manual run cannot reseed or skip Local's live queue.
 
 ### E. Agent + Tray on DEV PC only
 

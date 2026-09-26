@@ -3,6 +3,8 @@
   Test Cloud scripts after the Dev Local backup has been restored.
   Does not run Local capture (DataSync_11_RunLocal.sql).
   UserRights stays L2C-only (CaptureCloud=0). Detail Op=D stays a hard delete.
+  UserStatus and ListviewItem are not synced. Cloud identity reseed runs here (never on Local).
+  Restored Direction=L2C outbox copies are closed. C2L rows are left for the agent.
   Refuses SB1 and the production cloud host.
 
   Password: -Password or env SB2_TEST_CLOUD_SQL_PASSWORD. Never written to disk.
@@ -35,7 +37,11 @@ $scripts = @(
     'DataSync_28_EnableC2L_Capture.sql',
     'Deploy_TxnDetail_HardDeleteSync_CLOUD.sql',
     'Deploy_EditDeleteSync_CLOUD.sql',
-    'DataSync_UserRights_L2C_Only.sql'
+    'DataSync_UserRights_L2C_Only.sql',
+    'Cloud_Reseed_TransactionIdRanges.sql',
+    'Fix_AllTxn_Cloud_C2L_Capture.sql',
+    'SB2_Disable_UserStatus_And_Listview_Sync.sql',
+    'Cloud_UserStatus_GhostCleanup.sql'
 )
 
 if ($EnableTxnC2L) {
@@ -49,6 +55,7 @@ if ($EnableTxnC2L) {
 
 $scripts += @(
     'Sales_Listview_NarrowCarDiscount.sql',
+    'SB2_Close_RestoredCloud_L2C_Outbox.sql',
     'SB2_Assert_DetailHardDelete.sql'
 )
 

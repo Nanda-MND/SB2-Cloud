@@ -14,6 +14,10 @@
   (until int ceiling). Never RESEED Local for this plan.
 
   Before enable txn C2L capture, run this on Cloud once (or after verify).
+
+  Table list matches Fix_AllTxn_Cloud_C2L_Capture.sql (Sale/Purchase/Transfer
+  plus ReturnReceive, StockOpening, RawIssue, FinishGoods, ReturnStock, GetStock,
+  openings, CustSupTransfer). Missing tables SKIP. Never run on Local SB2.
 */
 
 SET NOCOUNT ON;
@@ -35,11 +39,17 @@ PRINT '=== CLOUD identity RESEED ===';
 PRINT 'Database: ' + DB_NAME();
 PRINT 'CloudFloor: ' + CAST(@CloudFloor AS nvarchar(20));
 PRINT 'DryRun: ' + CAST(@DryRun AS nvarchar(5));
-PRINT 'WARNING: Run on CLOUD only. Do not run on Local.';
+PRINT 'WARNING: Run on CLOUD only (db_abe8c0_sb2). Do not run on Local SB2.';
 PRINT '';
 
-IF DB_NAME() LIKE N'%SB1%' OR DB_NAME() LIKE N'SB1'
-    PRINT 'WARNING: DB name looks Local — abort unless you are sure this is Cloud.';
+IF DB_NAME() IN (N'SB2', N'SB1', N'SB', N'db_abbe78_warehouse', N'db_abe8c0_erp', N'db_abe8c0_luckyone')
+   OR DB_NAME() LIKE N'%warehouse%'
+   OR DB_NAME() LIKE N'%luckyone%'
+   OR DB_NAME() LIKE N'%SB1%'
+BEGIN
+    RAISERROR(N'STOP: Cloud_Reseed_TransactionIdRanges is CLOUD ONLY. Refusing Local SB2 / SB1 / production. Never RESEED Local up to the 2e9 floor.', 16, 1);
+    RETURN;
+END
 
 DECLARE @tables TABLE (TableName sysname PRIMARY KEY, Sort int);
 INSERT @tables (TableName, Sort) VALUES
@@ -53,7 +63,18 @@ INSERT @tables (TableName, Sort) VALUES
     (N'AdjustmentHead', 80), (N'AdjustmentDetail', 81),
     (N'StockReceiveHead', 90), (N'StockReceiveDetail', 91),
     (N'IncomeExpenseHead', 100), (N'IncomeExpenseDetail', 101),
-    (N'JournalHead', 110), (N'JournalDetail', 111);
+    (N'JournalHead', 110), (N'JournalDetail', 111),
+    (N'ReturnReceiveHead', 120), (N'ReturnReceiveDetail', 121),
+    (N'StockOpeningHead', 130), (N'StockOpeningDetail', 131),
+    (N'RawIssueHead', 140), (N'RawIssueDetail', 141),
+    (N'FinishGoodsHead', 150), (N'FinishGoodsDetail', 151),
+    (N'ReturnStockHead', 160), (N'ReturnStockDetail', 161),
+    (N'GetStockHead', 170), (N'GetStockDetail', 171),
+    (N'AccountOpeningHead', 180), (N'AccountOpeningDetail', 181),
+    (N'CustomerOpeningHead', 190), (N'CustomerOpeningDetail', 191),
+    (N'SupplierOpeningHead', 200), (N'SupplierOpeningDetail', 201),
+    (N'ManufacturerOpeningHead', 210), (N'ManufacturerOpeningDetail', 211),
+    (N'CustSupTransfer', 220);
 
 DECLARE @t sysname, @obj int, @idCol sysname, @sql nvarchar(max);
 DECLARE @maxId bigint, @ident bigint, @newSeed bigint;

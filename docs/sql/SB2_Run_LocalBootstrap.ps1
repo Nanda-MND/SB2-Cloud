@@ -43,6 +43,7 @@ $required = @(
     'DataSync_UserRights_L2C_Only_Local.sql',
     'Fix_Duplicate_UserRights_BothSides.sql',
     'Sales_Listview_NarrowCarDiscount.sql',
+    'SB2_Disable_UserStatus_And_Listview_Sync.sql',
     'SB2_Assert_DetailHardDelete.sql'
 )
 
@@ -63,7 +64,14 @@ foreach ($name in $required) {
 }
 
 # Cloud-only scripts must never run from this runner.
-$forbiddenHere = @('DataSync_28_EnableC2L_Capture.sql', 'DataSync_11_RunCloud.sql', 'Deploy_TxnDetail_HardDeleteSync_CLOUD.sql', 'Deploy_EditDeleteSync_CLOUD.sql')
+$forbiddenHere = @(
+    'DataSync_28_EnableC2L_Capture.sql',
+    'DataSync_11_RunCloud.sql',
+    'Deploy_TxnDetail_HardDeleteSync_CLOUD.sql',
+    'Deploy_EditDeleteSync_CLOUD.sql',
+    'Cloud_Reseed_TransactionIdRanges.sql',
+    'SB2_Close_RestoredCloud_L2C_Outbox.sql'
+)
 foreach ($name in $forbiddenHere) {
     if ($required -contains $name) {
         throw "Local bootstrap must not run $name."
