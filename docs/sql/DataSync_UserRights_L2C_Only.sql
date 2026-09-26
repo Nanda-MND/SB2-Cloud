@@ -1,13 +1,16 @@
 /*
-  UserRights → L2C only (disable C2L).
+  CLOUD ONLY — UserRights L2C apply in, C2L off.
 
-  Local edits push to Cloud (L2C).
-  Cloud edits must NOT push back to Local (C2L off).
+  Run this on Test Cloud after the Dev Local backup is restored.
+  Do not run it on Dev Local. The restored copy still has CaptureLocal=1
+  and local sync triggers (including tr_UserRights_SyncMetadata). This script
+  turns those off on the cloud database.
 
-  Run on CLOUD first (db that has CaptureCloud / C2L triggers).
-  Then run LOCAL verify section (or whole script — Local parts are safe).
+  Local keeps CaptureLocal=1 via DataSync_UserRights_L2C_Only_Local.sql.
 
-  sqlcmd ... -i DataSync_UserRights_L2C_Only.sql
+  Expected after this file:
+    CLOUD  IsEnabled=1 CaptureLocal=0 CaptureCloud=0  and no UserRights %Sync% trigger
+    LOCAL  IsEnabled=1 CaptureLocal=1 CaptureCloud=0  (set by the Local script, not this one)
 */
 
 SET NOCOUNT ON;
@@ -19,44 +22,49 @@ SELECT TableName, IsEnabled, CaptureLocal, CaptureCloud, Notes
 FROM dbo.SyncConfig
 WHERE TableName = N'UserRights';
 
--- 1) Drop C2L cloud-capture trigger if present
-IF OBJECT_ID(N'dbo.tr_SyncOutbox_UserRights', N'TR') IS NOT NULL
+-- 1) Drop every UserRights trigger the Test Cloud assert treats as sync capture.
+--    Restored local names include tr_UserRights_SyncMetadata, tr_SyncOutbox_UserRights,
+--    and tr_SyncCaptureCloud_UserRights.
+DECLARE @drop nvarchar(max) = N'';
+SELECT @drop = @drop
+    + N'DROP TRIGGER ' + QUOTENAME(OBJECT_SCHEMA_NAME(t.object_id)) + N'.' + QUOTENAME(t.name) + N';' + CHAR(10)
+FROM sys.triggers AS t
+WHERE t.parent_id = OBJECT_ID(N'dbo.UserRights')
+  AND t.name LIKE N'%Sync%';
+
+IF LEN(@drop) > 0
 BEGIN
-    DROP TRIGGER dbo.tr_SyncOutbox_UserRights;
-    PRINT N'Dropped trigger dbo.tr_SyncOutbox_UserRights';
+    PRINT N'Dropping UserRights sync triggers:';
+    PRINT @drop;
+    EXEC sys.sp_executesql @drop;
 END
 ELSE
-    PRINT N'No tr_SyncOutbox_UserRights (ok).';
+    PRINT N'No UserRights %Sync% triggers (ok).';
 
--- Alternate naming used by some installers
-IF OBJECT_ID(N'dbo.tr_SyncCaptureCloud_UserRights', N'TR') IS NOT NULL
-BEGIN
-    DROP TRIGGER dbo.tr_SyncCaptureCloud_UserRights;
-    PRINT N'Dropped trigger dbo.tr_SyncCaptureCloud_UserRights';
-END
-
--- 2) SyncConfig: keep inbound L2C apply enabled; turn off C2L capture
+-- 2) Cloud SyncConfig: inbound L2C apply stays on. Local capture and C2L capture stay off.
+--    A restore from Dev Local leaves CaptureLocal=1. That must be cleared here.
 IF EXISTS (SELECT 1 FROM dbo.SyncConfig WHERE TableName = N'UserRights')
 BEGIN
     UPDATE dbo.SyncConfig
-    SET CaptureCloud = 0,
+    SET CaptureLocal = 0,
+        CaptureCloud = 0,
         IsEnabled = 1,
         Notes = LEFT(
-            CONCAT(ISNULL(Notes, N''), N' | UserRights L2C-only ', CONVERT(nvarchar(30), SYSUTCDATETIME(), 126)),
+            CONCAT(ISNULL(Notes, N''), N' | Cloud UserRights L2C-apply only ', CONVERT(nvarchar(30), SYSUTCDATETIME(), 126)),
             500)
     WHERE TableName = N'UserRights';
-    PRINT N'SyncConfig UserRights: CaptureCloud=0, IsEnabled=1';
+    PRINT N'SyncConfig UserRights: CaptureLocal=0, CaptureCloud=0, IsEnabled=1';
 END
 ELSE
 BEGIN
     INSERT INTO dbo.SyncConfig
         (TableName, IsEnabled, CaptureLocal, CaptureCloud, PrimaryKeyColumns, BatchSize, Priority, Notes)
     VALUES
-        (N'UserRights', 1, 0, 0, N'ID', 100, 30, N'L2C inbound apply only (no C2L)');
-    PRINT N'Inserted SyncConfig UserRights (L2C apply only).';
+        (N'UserRights', 1, 0, 0, N'ID', 100, 30, N'Cloud L2C apply only (no local capture, no C2L)');
+    PRINT N'Inserted SyncConfig UserRights (CaptureLocal=0, CaptureCloud=0, IsEnabled=1).';
 END
 
--- 3) Clear pending C2L outbox for UserRights (do not push Cloud→Local)
+-- 3) Clear pending C2L outbox for UserRights (do not push Cloud to Local)
 DELETE FROM dbo.SyncOutbox
 WHERE TableName = N'UserRights'
   AND Direction = N'C2L'
@@ -68,20 +76,12 @@ SELECT TableName, IsEnabled, CaptureLocal, CaptureCloud, Notes
 FROM dbo.SyncConfig
 WHERE TableName = N'UserRights';
 
-PRINT N'=== C2L triggers still on UserRights? (expect 0) ===';
+PRINT N'=== UserRights %Sync% triggers still present? (expect 0) ===';
 SELECT name
 FROM sys.triggers
 WHERE parent_id = OBJECT_ID(N'dbo.UserRights')
   AND name LIKE N'%Sync%';
 
-PRINT N'Done on this DB.';
-PRINT N'';
-PRINT N'LOCAL (office SB1) — ensure L2C capture stays ON:';
-PRINT N'  UPDATE dbo.SyncConfig';
-PRINT N'  SET IsEnabled=1, CaptureLocal=1, CaptureCloud=0';
-PRINT N'  WHERE TableName=N''UserRights'';';
-PRINT N'';
-PRINT N'Expected:';
-PRINT N'  LOCAL  IsEnabled=1 CaptureLocal=1 CaptureCloud=0  → L2C out';
-PRINT N'  CLOUD  IsEnabled=1 CaptureLocal=0 CaptureCloud=0  → L2C apply in, no C2L out';
+PRINT N'Done on this cloud DB.';
+PRINT N'Dev Local must keep CaptureLocal=1. That is DataSync_UserRights_L2C_Only_Local.sql, not this file.';
 GO

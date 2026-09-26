@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM C2L deploy — LOCAL ONLY (Server\SB1 / SB1)
 REM Applies Cloud changes to Local when Sync Agent pulls C2L.
 REM Run on office PC (must reach local SQL).

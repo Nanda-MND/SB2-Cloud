@@ -65,6 +65,18 @@ BEGIN
     INNER JOIN sys.types ty ON c.user_type_id = ty.user_type_id
     WHERE c.object_id = @obj AND c.name = @pk;
 
+    IF @pkType IS NULL
+    BEGIN
+        RAISERROR(N'SyncApply_Generic: PK type missing on %s.', 16, 1, @TableName);
+        RETURN;
+    END
+
+    -- JSON_VALUE is nvarchar. Comparing that sql_variant to an int PK throws
+    -- ("Implicit conversion from data type sql_variant") and leaves Op=D Pending.
+    -- Head Op=D stays a soft IsDeleted update. Detail Op=D stays a hard DELETE.
+    DECLARE @pkPred nvarchar(400) =
+        QUOTENAME(@pk) + N' = TRY_CAST(JSON_VALUE(@pkjson, ''$.' + REPLACE(@pk, N'''', N'''''') + N''') AS ' + @pkType + N')';
+
     IF @Source = 'Cloud'
     BEGIN
         IF EXISTS (
@@ -96,8 +108,9 @@ BEGIN
     BEGIN
         DECLARE @localMod datetime2(3);
         DECLARE @chk nvarchar(max) = N'SELECT @m = SyncModifiedAt FROM ' + QUOTENAME(@TableName) +
-            N' WHERE ' + QUOTENAME(@pk) + N' = @id';
-        EXEC sp_executesql @chk, N'@m datetime2(3) OUTPUT, @id sql_variant', @m = @localMod OUTPUT, @id = @pkVal;
+            N' WHERE ' + @pkPred;
+        EXEC sp_executesql @chk, N'@m datetime2(3) OUTPUT, @pkjson nvarchar(500)',
+            @m = @localMod OUTPUT, @pkjson = @PrimaryKeyJson;
         IF @localMod IS NOT NULL AND @localMod > @RemoteModifiedAt
         BEGIN
             -- Cloud-zone IDs (>= 2e9) are Cloud-authored. Timestamp LocalWins permanently
@@ -115,9 +128,9 @@ BEGIN
                 IF COL_LENGTH(@TableName, 'IsDeleted') IS NOT NULL
                     SET @softSql += N' OR ISNULL(IsDeleted,0) <> 0';
                 SET @softSql += N' THEN 1 ELSE 0 END FROM ' + QUOTENAME(@TableName) +
-                    N' WHERE ' + QUOTENAME(@pk) + N' = @id';
-                EXEC sp_executesql @softSql, N'@s bit OUTPUT, @id sql_variant',
-                    @s = @localSoftDeleted OUTPUT, @id = @pkVal;
+                    N' WHERE ' + @pkPred;
+                EXEC sp_executesql @softSql, N'@s bit OUTPUT, @pkjson nvarchar(500)',
+                    @s = @localSoftDeleted OUTPUT, @pkjson = @PrimaryKeyJson;
             END
 
             IF @isCloudZonePk = 0 AND NOT (@localSoftDeleted = 1 AND @isDelete = 0)
@@ -150,8 +163,9 @@ BEGIN
             IF COL_LENGTH(@TableName, 'SyncModifiedAt') IS NOT NULL SET @delSql += N', SyncModifiedAt = @ts';
             IF COL_LENGTH(@TableName, 'SyncOrigin') IS NOT NULL
                 SET @delSql += N', SyncOrigin = ' + CASE WHEN @Source = 'Local' THEN N'1' ELSE N'2' END;
-            SET @delSql += N' WHERE ' + QUOTENAME(@pk) + N' = @id';
-            EXEC sp_executesql @delSql, N'@ts datetime2(3), @id sql_variant', @ts = @RemoteModifiedAt, @id = @pkVal;
+            SET @delSql += N' WHERE ' + @pkPred;
+            EXEC sp_executesql @delSql, N'@ts datetime2(3), @pkjson nvarchar(500)',
+                @ts = @RemoteModifiedAt, @pkjson = @PrimaryKeyJson;
             -- Soft-delete no-op (0 rows) must not report Applied for C2L.
             IF @Source = N'Cloud' AND @@ROWCOUNT = 0
             BEGIN
@@ -178,8 +192,8 @@ SELECT @x = CASE WHEN EXISTS (
             -- Hard DELETE for *Detail (and any table without IsDeleted).
             BEGIN TRY EXEC sp_set_session_context @key = N'SyncAllowPhysicalDelete', @value = 1; END TRY BEGIN CATCH END CATCH;
             DECLARE @hardDel nvarchar(max) = N'DELETE FROM ' + QUOTENAME(@TableName) +
-                N' WHERE ' + QUOTENAME(@pk) + N' = @id';
-            EXEC sp_executesql @hardDel, N'@id sql_variant', @id = @pkVal;
+                N' WHERE ' + @pkPred;
+            EXEC sp_executesql @hardDel, N'@pkjson nvarchar(500)', @pkjson = @PrimaryKeyJson;
             BEGIN TRY EXEC sp_set_session_context @key = N'SyncAllowPhysicalDelete', @value = NULL; END TRY BEGIN CATCH END CATCH;
         END
         SET @Applied = 1;

@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 
 REM Cloud L2C apply — full deploy (permissions + SyncApply + wrappers + verify)
 

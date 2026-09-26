@@ -49,20 +49,7 @@ namespace SB.SyncAgent
             {
                 var batch = ClaimBatch(local, "L2C");
                 foreach (DataRow row in batch.Rows)
-                {
-                    long outboxId = Convert.ToInt64(row["OutboxID"]);
-                    string table = row["TableName"].ToString();
-                    try
-                    {
-                        ApplyOnCloud(cloud, row);
-                        CompleteOutbox(local, outboxId, "Synced");
-                    }
-                    catch (Exception ex)
-                    {
-                        FailOutbox(local, outboxId, ex.Message);
-                        Log("Push failed OutboxID=" + outboxId + " " + table + ": " + ex.Message);
-                    }
-                }
+                    ApplyOutboxRow(local, cloud, row, true);
             }
         }
 
@@ -71,41 +58,139 @@ namespace SB.SyncAgent
             using (var cloud = ConnectionIni.OpenCloud())
             using (var local = ConnectionIni.OpenLocal())
             {
+                EnsureOpen(local);
                 Log("C2L pull Local DB=" + local.Database + " Server=" + local.DataSource);
                 var batch = ClaimBatch(cloud, "C2L");
                 foreach (DataRow row in batch.Rows)
+                    ApplyOutboxRow(cloud, local, row, false);
+            }
+        }
+
+        /// <summary>
+        /// source owns the outbox row. target is where the row is applied.
+        /// A failed apply can close the SqlConnection (timeout or severity 20).
+        /// The next ExecuteScalar then throws "current state is closed".
+        /// Re-open before each row, and retry that row once after a closed connection.
+        /// </summary>
+        private void ApplyOutboxRow(SqlConnection source, SqlConnection target, DataRow row, bool push)
+        {
+            long outboxId = Convert.ToInt64(row["OutboxID"]);
+            string table = row["TableName"].ToString();
+            Exception last = null;
+            for (int attempt = 1; attempt <= 2; attempt++)
+            {
+                try
                 {
-                    long outboxId = Convert.ToInt64(row["OutboxID"]);
-                    string table = row["TableName"].ToString();
-                    try
+                    EnsureOpen(source);
+                    EnsureOpen(target);
+                    if (push)
                     {
-                        var outcome = ApplyOnLocal(local, row);
+                        ApplyOnCloud(target, row);
+                        EnsureOpen(source);
+                        CompleteOutbox(source, outboxId, "Synced");
+                    }
+                    else
+                    {
+                        var outcome = ApplyOnLocal(target, row);
+                        EnsureOpen(source);
                         if (outcome == ApplyOutcome.ConflictSkipped)
                         {
-                            // Surface why Purchase C2L stays Conflict (LastError was null before).
-                            CompleteOutbox(cloud, outboxId, "Conflict",
-                                "LocalWinsSkipped on " + local.Database + " for " + table
+                            CompleteOutbox(source, outboxId, "Conflict",
+                                "LocalWinsSkipped on " + target.Database + " for " + table
                                 + " " + Convert.ToString(row["PrimaryKeyJson"]));
                             Log("C2L conflict OutboxID=" + outboxId + " " + table
                                 + " " + Convert.ToString(row["PrimaryKeyJson"]));
                         }
                         else
                         {
-                            CompleteOutbox(cloud, outboxId, "Synced");
+                            CompleteOutbox(source, outboxId, "Synced");
                         }
                     }
-                    catch (Exception ex)
+                    last = null;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    last = ex;
+                    if (attempt == 1 && ConnectionNeedsReopen(source, target, ex))
                     {
-                        FailOutbox(cloud, outboxId, ex.Message);
-                        Log("Pull failed OutboxID=" + outboxId + " " + table
-                            + " LocalDB=" + local.Database + ": " + ex.Message);
+                        Log((push ? "Push" : "Pull") + " retry OutboxID=" + outboxId + " " + table + " after closed connection.");
+                        TryReopen(source);
+                        TryReopen(target);
+                        continue;
                     }
+                    break;
                 }
             }
+
+            if (last == null)
+                return;
+
+            try
+            {
+                EnsureOpen(source);
+                FailOutbox(source, outboxId, last.Message);
+            }
+            catch (Exception failEx)
+            {
+                Log("FailOutbox failed OutboxID=" + outboxId + ": " + failEx.Message);
+            }
+
+            string where = push ? "" : (" LocalDB=" + SafeDatabaseName(target));
+            Log((push ? "Push" : "Pull") + " failed OutboxID=" + outboxId + " " + table + where + ": " + last.Message);
+        }
+
+        private static void EnsureOpen(SqlConnection cnn)
+        {
+            if (cnn == null)
+                throw new InvalidOperationException("SQL connection is missing.");
+            if (cnn.State == ConnectionState.Open)
+                return;
+            // Broken and Closed both need Close() before Open() or the next command stays dead.
+            cnn.Close();
+            cnn.Open();
+        }
+
+        private static void TryReopen(SqlConnection cnn)
+        {
+            if (cnn == null)
+                return;
+            try
+            {
+                // Always recycle. State can still read Open after the server has already dropped the session.
+                cnn.Close();
+                cnn.Open();
+            }
+            catch
+            {
+                // The caller records the original apply error.
+            }
+        }
+
+        private static bool ConnectionNeedsReopen(SqlConnection source, SqlConnection target, Exception ex)
+        {
+            if (source != null && source.State != ConnectionState.Open)
+                return true;
+            if (target != null && target.State != ConnectionState.Open)
+                return true;
+            string message = ex == null ? "" : ex.Message;
+            return message.IndexOf("current state is closed", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string SafeDatabaseName(SqlConnection cnn)
+        {
+            try
+            {
+                if (cnn != null && cnn.State == ConnectionState.Open)
+                    return cnn.Database;
+            }
+            catch { }
+            return "?";
         }
 
         private static DataTable ClaimBatch(SqlConnection cnn, string direction)
         {
+            EnsureOpen(cnn);
             using (var cmd = new SqlCommand("dbo.SyncClaimOutboxBatch", cnn))
             {
                 cmd.CommandType = CommandType.StoredProcedure;
@@ -132,6 +217,7 @@ namespace SB.SyncAgent
 
         private static ApplyOutcome ExecApply(SqlConnection cnn, string source, DataRow row)
         {
+            EnsureOpen(cnn);
             string table = row["TableName"].ToString();
             // C2L: always SyncApply_Generic when present so Local NEW_OK post-apply check cannot be bypassed
             // by a stale SyncApply_<Table> wrapper. L2C still prefers table-specific procs.
@@ -163,6 +249,8 @@ namespace SB.SyncAgent
                 var appliedParam = new SqlParameter("@Applied", SqlDbType.Bit) { Direction = ParameterDirection.Output };
                 cmd.Parameters.Add(conflict);
                 cmd.Parameters.Add(appliedParam);
+                cmd.CommandTimeout = 0;
+                EnsureOpen(cnn);
                 cmd.ExecuteNonQuery();
 
                 bool conflictLogged = conflict.Value != DBNull.Value && (bool)conflict.Value;
@@ -171,9 +259,18 @@ namespace SB.SyncAgent
                 if (!applied && !conflictLogged)
                     throw new InvalidOperationException(proc + " did not apply row.");
 
+                // Detail Op=D is a physical DELETE. The row being gone is success.
+                // Head Op=D stays in the table (soft IsDeleted) and must still be found.
+                string operation = row["Operation"] == DBNull.Value
+                    ? ""
+                    : Convert.ToString(row["Operation"]).Trim();
+                bool detailHardDelete = string.Equals(operation, "D", StringComparison.OrdinalIgnoreCase)
+                    && table.EndsWith("Detail", StringComparison.OrdinalIgnoreCase);
+
                 // C2L must actually land on Local before Cloud outbox can be Synced.
                 if (c2l
                     && applied && !conflictLogged
+                    && !detailHardDelete
                     && !RowExistsForPrimaryKey(cnn, table, Convert.ToString(row["PrimaryKeyJson"])))
                 {
                     throw new InvalidOperationException(
@@ -189,6 +286,7 @@ namespace SB.SyncAgent
 
         private static bool RowExistsForPrimaryKey(SqlConnection cnn, string table, string primaryKeyJson)
         {
+            EnsureOpen(cnn);
             if (string.IsNullOrWhiteSpace(table) || string.IsNullOrWhiteSpace(primaryKeyJson))
                 return false;
             if (table.IndexOfAny(new[] { ';', '-', ' ', '\'' }) >= 0)
@@ -227,6 +325,7 @@ SELECT CASE WHEN EXISTS (
 
         private static bool ProcedureExists(SqlConnection cnn, string procName)
         {
+            EnsureOpen(cnn);
             using (var cmd = new SqlCommand(
                 "SELECT 1 FROM sys.procedures WHERE object_id = OBJECT_ID(@name)", cnn))
             {
@@ -237,6 +336,7 @@ SELECT CASE WHEN EXISTS (
 
         private static bool ProcedureHasParameter(SqlConnection cnn, string procName, string paramName)
         {
+            EnsureOpen(cnn);
             using (var cmd = new SqlCommand(@"
 SELECT 1
 FROM sys.parameters p
@@ -256,6 +356,7 @@ WHERE p.object_id = OBJECT_ID(@proc)
 
         private static void CompleteOutbox(SqlConnection cnn, long outboxId, string status, string lastError = null)
         {
+            EnsureOpen(cnn);
             if (lastError == null)
             {
                 using (var cmd = new SqlCommand("dbo.SyncCompleteOutbox", cnn))
@@ -285,6 +386,7 @@ WHERE OutboxID = @Id;", cnn))
 
         private static void FailOutbox(SqlConnection cnn, long outboxId, string error)
         {
+            EnsureOpen(cnn);
             using (var cmd = new SqlCommand(@"
 UPDATE dbo.SyncOutbox
 SET Status = CASE WHEN AttemptCount >= @Max THEN 'DeadLetter' ELSE 'Pending' END,

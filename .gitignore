@@ -1,0 +1,19 @@
+# Connection files and backups can hold secrets. Do not commit them.
+*.ini
+*.bak
+*.zip
+
+# Dev PC build outputs. Do not commit exe/dll/pdb or Release artifacts.
+# Ignore contents, not the bin directory itself, so the Reports exception can be re-included.
+[Bb]in/**
+[Oo]bj/**
+
+# Crystal reports load from the folder next to SB.exe:
+#   SB\bin\Debug\Reports\*.rpt
+# A pull must leave those files at that path. Nothing else under bin/ is tracked.
+!SB/[Bb]in/
+!SB/[Bb]in/[Dd]ebug/
+SB/[Bb]in/[Dd]ebug/**
+!SB/[Bb]in/[Dd]ebug/[Rr]eports/
+SB/[Bb]in/[Dd]ebug/[Rr]eports/**
+!SB/[Bb]in/[Dd]ebug/[Rr]eports/*.rpt

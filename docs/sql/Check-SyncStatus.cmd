@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM Cloud sync status check — run on CLIENT PC (Local SQL).
 setlocal EnableExtensions
 cd /d "%~dp0"

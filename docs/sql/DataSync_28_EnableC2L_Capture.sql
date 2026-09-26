@@ -60,6 +60,66 @@ BEGIN
     IF COL_LENGTH(@TableName, N'Sr') IS NOT NULL SET @delJsonCols += N', d.Sr';
     IF COL_LENGTH(@TableName, N'CodeID') IS NOT NULL AND @delJsonCols NOT LIKE N'%CodeID%' SET @delJsonCols += N', d.CodeID';
 
+    -- Same metadata / soft-delete triggers as Local SyncInstall_Table.
+    -- Metadata's own SyncModifiedAt update must not enqueue Op=U over a head Op=D.
+    -- Soft-delete must set source IsDeleted=1 even if metadata already set SyncSuppressMetadata.
+    IF OBJECT_ID(N'dbo.tr_' + @TableName + N'_SyncMetadata', N'TR') IS NOT NULL
+        EXEC(N'DROP TRIGGER dbo.tr_' + @TableName + N'_SyncMetadata');
+
+    SET @sql = N'CREATE TRIGGER dbo.tr_' + @TableName + N'_SyncMetadata
+ON ' + QUOTENAME(@TableName) + N'
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF SESSION_CONTEXT(N''SyncSuppressMetadata'') = 1 RETURN;
+    IF NOT EXISTS (
+        SELECT 1 FROM inserted i
+        LEFT JOIN deleted d ON d.' + QUOTENAME(@pk) + N' = i.' + QUOTENAME(@pk) + N'
+        WHERE d.' + QUOTENAME(@pk) + N' IS NULL
+           OR (i.SyncModifiedAt = d.SyncModifiedAt AND ISNULL(i.SyncModifiedBy, -1) = ISNULL(d.SyncModifiedBy, -1))
+    ) RETURN;
+    -- Marker: suppressNestedOutbox
+    DECLARE @prevOutbox sql_variant = SESSION_CONTEXT(N''SyncSuppressOutbox'');
+    EXEC sp_set_session_context @key = N''SyncSuppressMetadata'', @value = 1;
+    EXEC sp_set_session_context @key = N''SyncSuppressOutbox'', @value = 1;
+    UPDATE t SET t.SyncModifiedAt = sysutcdatetime(), t.SyncModifiedBy = COALESCE(i.SyncModifiedBy, t.SyncModifiedBy)
+    FROM ' + QUOTENAME(@TableName) + N' t
+    INNER JOIN inserted i ON i.' + QUOTENAME(@pk) + N' = t.' + QUOTENAME(@pk) + N';
+    EXEC sp_set_session_context @key = N''SyncSuppressOutbox'', @value = @prevOutbox;
+END';
+    EXEC sp_executesql @sql;
+
+    IF @hasDeleted = 1 AND @isDetail = 0 AND COL_LENGTH(@TableName, N'IsDeleted') IS NOT NULL
+    BEGIN
+        IF OBJECT_ID(N'dbo.tr_' + @TableName + N'_SoftDeleteSync', N'TR') IS NOT NULL
+            EXEC(N'DROP TRIGGER dbo.tr_' + @TableName + N'_SoftDeleteSync');
+
+        SET @sql = N'CREATE TRIGGER dbo.tr_' + @TableName + N'_SoftDeleteSync
+ON ' + QUOTENAME(@TableName) + N'
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Marker: headSoftDeleteIsDeleted
+    IF NOT EXISTS (
+        SELECT 1 FROM inserted i INNER JOIN deleted d ON d.' + QUOTENAME(@pk) + N' = i.' + QUOTENAME(@pk) + N'
+        WHERE ISNULL(i.Deleted, 0) <> 0 AND ISNULL(d.Deleted, 0) = 0
+    ) RETURN;
+    DECLARE @prevOutbox sql_variant = SESSION_CONTEXT(N''SyncSuppressOutbox'');
+    EXEC sp_set_session_context @key = N''SyncSuppressMetadata'', @value = 1;
+    EXEC sp_set_session_context @key = N''SyncSuppressOutbox'', @value = 1;
+    UPDATE t SET t.IsDeleted = 1,
+        t.DeletedAt = COALESCE(t.DeletedAt, i.DeletedAt, sysutcdatetime()),
+        t.DeletedBy = COALESCE(t.DeletedBy, i.DeletedBy, i.SyncModifiedBy)
+    FROM ' + QUOTENAME(@TableName) + N' t
+    INNER JOIN inserted i ON i.' + QUOTENAME(@pk) + N' = t.' + QUOTENAME(@pk) + N'
+    WHERE ISNULL(i.Deleted, 0) <> 0 AND ISNULL(t.IsDeleted, 0) = 0;
+    EXEC sp_set_session_context @key = N''SyncSuppressOutbox'', @value = @prevOutbox;
+END';
+        EXEC sp_executesql @sql;
+    END
+
     DECLARE @triggerEvents nvarchar(30) = CASE WHEN @isDetail = 1 THEN N'INSERT, UPDATE, DELETE' ELSE N'INSERT, UPDATE' END;
     DECLARE @opCase nvarchar(max) = N'CASE WHEN d.' + QUOTENAME(@pk) + N' IS NULL THEN ''I''';
     IF COL_LENGTH(@TableName, N'IsDeleted') IS NOT NULL

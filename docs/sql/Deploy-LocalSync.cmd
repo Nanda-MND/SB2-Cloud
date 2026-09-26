@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM Run on CLIENT PC after SQL login works.
 REM Double-click or: Deploy-LocalSync.cmd
 

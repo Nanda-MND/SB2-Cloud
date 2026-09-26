@@ -18,6 +18,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+throw "SB2 Dev/Test lock: this script targets SB1 and the production cloud host. Use SB2_Run_LocalBootstrap.ps1 and SB2_Run_CloudAfterRestore.ps1. Live/Client cutover is not approved."
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = (Resolve-Path (Join-Path $ScriptDir "..\..")).Path
 
