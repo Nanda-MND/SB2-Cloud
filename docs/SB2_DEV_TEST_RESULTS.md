@@ -182,3 +182,10 @@ No fresh bak restore. No SB.exe rebuild. No Windows service. No SB2-git. Passwor
 - Results-only commit follows; EncryptAndOnce bin/obj dirt discarded (not committed).
 - Written: 2026-09-26 22:15 Asia/Rangoon
 
+
+---
+
+## 2026-09-26 23:08 Asia/Rangoon (UTC+6:30) — current evidence note
+
+- **Suite C read-only spot:** FAIL for SaleHead `45634` (`Cloud Deleted=1 IsDeleted=0`); other soft remnants/Purchase/Transfer checks PASS.
+- **Suite A all-txn matrix:** **IN PROGRESS** at `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\all_txn_20260926_225738\`; do not invent PASS/FAIL cells. Review `suiteA_run.log` for evidence.
