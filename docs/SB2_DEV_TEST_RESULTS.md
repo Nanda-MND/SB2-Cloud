@@ -123,3 +123,25 @@ Recent /once window flooded with `C2L conflict â€¦ PurchaseHead` (OutboxID 326â€
 - Failures to clear before PASS: (1) extend cloud reseed or accept/document Fix_AllTxn-only ID zones; (2) disable UserStatus sync on cloud (and ideally local); (3) clear stuck L2C Pending (PurchaseHead D / UserStatus / Users / ListViewItem) without inventing data fixes.
 - Bak Length 146927616 retained under runtime (not in git).
 - Written: 2026-09-26 20:33:25 Asia/Rangoon
+## Tester recheck (current run, 2026-09-26 Asia/Rangoon)
+
+Owner instruction: fresh restore skipped; current Test Cloud `sql8006 / db_abe8c0_sb2` used. No SB2-git, SB.exe rebuild, service operation, or password output.
+
+### Steps executed
+
+- Step 2 `SB2_Run_LocalPendingFix.ps1 -Server localhost -Database SB2 -User sa`: exit 0. Local UserStatus/ListViewItem sync disabled; UserRights remained `1/1/0`.
+- Step 3 `SB2_Run_CloudAfterRestore.ps1` (without `-EnableTxnC2L`): exit 0. Target guard passed; detail hard-delete/head soft-delete and UserRights L2C-only assertions passed. Cloud reseed and capture setup completed; PurchaseHead Op=D requeue was 80.
+- Step 4 `SB2_Dev_EncryptAndOnce.ps1`: first attempt was blocked by the optional runtime `SB.SyncStatus.exe` tray process holding the destination. Only that process was stopped (no service); retry exit 0: Release SyncAgent/SyncStatus built, runtime connection files encrypted, and `/once` completed.
+
+### Acceptance checks
+
+**(a) Identity zones: PASS.** All requested Cloud tables are `IDENT_CURRENT=1999999999 / OK_CLOUD_ZONE`: AccountOpeningDetail/Head, CustomerOpeningDetail/Head, CustSupTransfer, FinishGoodsDetail/Head, GetStockDetail/Head, ManufacturerOpeningDetail/Head, RawIssueDetail/Head, ReturnReceiveDetail/Head, ReturnStockDetail/Head, StockOpeningDetail/Head, SupplierOpeningDetail/Head. Local was not reseeded: `SaleHead=45637`, `PurchaseHead=3913`.
+
+**(b) Sync rules: PASS.** Local and Cloud UserStatus are `0/0/0`; UserStatus sync triggers are absent; Cloud `UserStatus_CleanupGhosts` exists (`object_id=1589632756`). UserRights is Local `1/1/0`, Cloud `1/0/0`, with no `%Sync%` triggers. ListViewItem is `0/0/0` on both (where present).
+
+**(c) Script/assertions and soft deletes: PASS.** CloudAfterRestore exit 0; `OK Detail Op=D hard delete; Head Op=D soft delete`; `OK UserRights L2C-only (TestCloud)`; Cloud `PurchaseHead IsDeleted=1` count is `80` (expected approximately 80).
+
+**(d) Pending: PASS.** Read-only checks after `/once` returned no Local or Cloud `Pending`, `Syncing`, or `DeadLetter` groups for either L2C or C2L; therefore no LastError groups to report.
+
+**OVERALL: PASS** (checks a-d all pass).
+
