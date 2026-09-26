@@ -1,64 +1,53 @@
 # SB2-Cloud Dev / Test acceptance results
 
-Date: 2026-09-26 (Asia/Rangoon)
-HEAD: `005baafe4ccc6df62a2dc49e0c2c34fc91ac4f7b` (`005baaf`; merge-base --is-ancestor 005baaf HEAD: yes; 4424b69 ancestor: yes)
+Date: 2026-09-26 2026-09-26 14:17:01 (Asia/Rangoon / Myanmar Standard Time UTC+6:30)
+HEAD: `deba3081edb2c5fdf78b9aaa29ae06ff407f2506` (`deba308`; merge-base --is-ancestor deba308 HEAD: yes)
 Branch: `cursor/sb2-dev-test-bootstrap-9fc4`
-ERP copy: `005baaf` WinForms import (`frm_Sales.cs` present). Live/Client cutover was not started.
+Commit under test: deba308 (ObjectListView HintPath + frm_Main history wiring). Live/Client cutover was not started.
 
 ALREADY PASS at 4424b69 (not re-done this run):
 - Local bootstrap on `SB2`
 - Hosting-panel restore of post-bootstrap bak onto `db_abe8c0_sb2`
 - Backup script + CloudAfterRestore + EncryptAndOnce Pending=0 (prior Tester run)
 
-| # | Test | Expect | Result | Notes |
-|---|------|--------|--------|-------|
-| 1 | Environment | Only Dev Local + Test Cloud used | PASS | Dev Local `localhost` / `SB2` / `sa`. Test Cloud `sql8006.site4now.net` / `db_abe8c0_sb2`. Forbidden hosts/DBs not used. |
-| 2 | Repo | Work done in SB2-Cloud, not live SB | PASS | Branch `cursor/sb2-dev-test-bootstrap-9fc4` at `005baaf`. Remote `Nanda-MND/SB2-Cloud.git`. |
-| 3 | Local bootstrap | DataSync + Detail/Head packs + UserRights Local OK | PASS | Already PASS at 4424b69 (not re-done). |
-| 4 | Backup | `SB2_Run_Backup.ps1` exit 0, bak exists Length>0 | PASS | Already PASS at 4424b69 (not re-done). |
-| 5 | Cloud after-restore | Exit 0 + OK UserRights L2C-only (TestCloud) | PASS | Already PASS at 4424b69 (not re-done). |
-| 6 | Agent `/once` | Pending near 0 | PASS | Already PASS at 4424b69 (EncryptAndOnce Pending=0; not re-done). |
-| 7 | Master L2C | Dev edit -> Test Cloud | BLOCKED | Not exercised this run. |
-| 8 | C2L (if enabled) | Test Cloud edit -> Dev | BLOCKED | Not exercised. |
-| 9 | Detail delete | Dev delete line -> Test Cloud line gone | BLOCKED | Not exercised. |
-| 10 | Head soft-delete | Dev soft-delete -> Test Cloud stays deleted | BLOCKED | Not exercised. |
-| 11 | UserRights | Dev change -> Test Cloud; no C2L fight | BLOCKED | Not exercised this run. |
-| 12 | Offline Dev | ERP works; outbox drains later | BLOCKED | Not exercised. |
-| 13 | History progress | tspbHistoryLoad shows then hides on fill | FAIL | See H1. Source has no `tspbHistoryLoad`; runtime not reachable. |
-| 14 | History footer | Totals/Paid/PK/Bank Charges; Spring keeps visible | BLOCKED | See H2/H3. Cannot observe on running new frm_Main (build FAIL). |
-| 15 | History MultiSelect | Ctrl/Shift multi-row select stable | FAIL | See H4. Designer sets `dlvHistory.MultiSelect = false`. |
-| 16 | History columns | Sales Charges + narrow Car/Discount; Amount not crushed | BLOCKED | See H5. Source has Charges/Car wiring; runtime not reachable. |
-| 17 | History menu switch | Rapid menu change — no wrong columns / no crash | BLOCKED | Not run (no exe). |
-| S1 | Solution opens / SB builds | `SB.sln` Debug AnyCPU build exit 0; real `SB.exe` >> 31KB stub | FAIL | MSBuild VS2022 Enterprise exit 1. HintPath `..\..\777\777\bin\Debug\ObjectListView.dll` → `D:\Project\777\777\bin\Debug\ObjectListView.dll` missing. MSB3245 Could not resolve ObjectListView. CS0246 BrightIdeasSoftware in frm_Main / frm_Setup / frm_CodeList. Per lock: did NOT copy ObjectListView into repo (not from SB2-git either). After failed Rebuild, `SB\bin\Debug\SB.exe` is absent (prior 31232-byte stub removed by rebuild). |
+## Prerequisites (this run)
 
-## Build / login (this run at 005baaf)
+| Check | Result | Evidence |
+|-------|--------|----------|
+| Pull / ancestor | PASS | `git fetch/checkout/pull origin cursor/sb2-dev-test-bootstrap-9fc4`; HEAD `deba308`; `merge-base --is-ancestor deba308 HEAD` exit 0 |
+| HintPath ObjectListView | PASS | `SB\SB.csproj` HintPath `..\lib\ObjectListView.dll`; `lib\ObjectListView.dll` exists (Length 444928) |
+| Program.cs entry | PASS | `Application.Run(new frm_Login())` |
+| Environment lock | PASS | Dev Local `localhost` / `SB2` / `sa` only for ERP login. Test Cloud passwords unused this run. Forbidden hosts/DBs / service SB.SyncAgent not used. |
+
+## Build / login
 
 | Step | Result | Evidence |
 |------|--------|----------|
-| Pull / ancestor | PASS | `git pull` up to date; HEAD `005baafe4ccc6df62a2dc49e0c2c34fc91ac4f7b`; `merge-base --is-ancestor 005baaf HEAD` exit 0; `Test-Path SB\frm_Sales.cs` True |
-| S1 Build Debug AnyCPU | FAIL | `MSBuild SB.sln /p:Configuration=Debug /p:Platform="Any CPU" /t:Rebuild` exit 1. Primary error: missing ObjectListView at HintPath (see S1 notes). SyncAgent/SyncStatus built; SB project did not. |
-| Login frm_Login | BLOCKED | No buildable `SB.exe` from this import. `Program.cs` does `Application.Run(new frm_Login())` in source, but first-window / login UI not observed. Did not write ini into git checkout; did not point at live server. |
-| Main ERP after login | BLOCKED | Depends on successful login. |
+| S1 MSBuild Debug AnyCPU Rebuild | PASS | VS2022 Enterprise MSBuild exit 0. No error mentioning `D:\Project\777\...\ObjectListView.dll` or CS0246 BrightIdeasSoftware. `SB\bin\Debug\SB.exe` Length **1420800** (>> 31232). |
+| First window frm_Login | PASS | UIA: first main window title `frm_Login`; `tbPassword` / `btLogin` present. |
+| Login localhost/SB2 | PASS | Env password via UI Automation clipboard paste (never printed). Main ERP title `MinnNandar Solutions` opened. Dev Local `DBConnection.ini` decrypts to DataSource=`(local)` InitialCatalog=`SB2` UserID=`sa`. |
+| Main ERP after login | PASS | UIA `LOGIN_OUTCOME=MAIN_OPEN` / `MAIN_ERP=PASS`. |
 
-## History checks (NEW frm_Main only — do not reuse sample-app H1–H8 PASS)
+Notes for login setup on Dev Local only (not committed): machine `NANDA-HP` was missing from `LogInClient` (would show Unregistered Computer Name); inserted LoginClient + UserLoginInfo for Administrator; Administrator app password aligned to `SB2_DEV_LOCAL_SQL_PASSWORD` via app RC4 Encrypt for CheckPassword. No live-server ini written into git.
 
-PASS only if observed on new frm_Main after login. This run: build FAIL → no runtime. Source inspected for evidence only.
+## History checks (NEW frm_Main only — do not reuse sample-app H1–H8)
+
+Opened **Sales → Sales Invoice** on running new `frm_Main` after login. History list bound (41 UIA child rows; footer Total Amount 20,068,696).
 
 | # | Test | Expect | Result | Notes |
 |---|------|--------|--------|-------|
-| H1 | tspbHistoryLoad | Progress bar shows then hides while history loads | FAIL | `findstr tspb` / `tspbHistoryLoad` across `SB\*.cs`: no matches. No ToolStripProgressBar in `frm_Main.Designer.cs`. Not observed at runtime. |
-| H2 | Footer Totals/Paid/PK/Bank Charges | Labels correct vs data | BLOCKED | Source has `ShowTotalAmount`, `tslbMachine` / `tsLabelPaid` / `tsLabelBankCharges` and comment "Keep PK / Paid / Bank Charges / Total Amount visible". Not observed on running UI. |
-| H3 | Resize Main / Spring | Footer totals still visible | BLOCKED | Source: `tssLeft.Spring = true` (frm_Main.Designer.cs:206). Not observed after resize on running new frm_Main. |
-| H4 | MultiSelect | `dlvHistory.MultiSelect` true; Ctrl/Shift works | FAIL | `frm_Main.Designer.cs:1520`: `this.dlvHistory.MultiSelect = false;` also `SelectAllOnControlA = false`. Runtime multi-select not tested. |
-| H5 | Sales columns | Charges visible; Car/Discount narrow; Amount not crushed | BLOCKED | Source: SaleHistory dcol includes Car + Charges; Charges→"Bank Charges" width floor 110; FAmount labeled Amount. `Discount` string not found in frm_Main.cs. Runtime column widths not observed. |
-| H6 | Balance menu | Sort/layout OK | BLOCKED | Not run. |
-| H7 | Cashbook menu | Cashbook column defaults | BLOCKED | Not run. |
-| H8 | Switch menus rapidly | No wrong columns / crash | BLOCKED | Not run. |
+| 2a | tspbHistoryLoad | Progress bar shows then hides on bind | FAIL | UIA watcher during Sales Invoice click: `2a_SAW_PROGRESS=False SAW_HIDE=False`. Bind succeeded (rows + footer appeared) but ToolStripProgressBar was not observed as a visible ProgressBar in the UIA tree (likely too brief and/or StatusStrip-hosted bar not exposed). Source does call `BeginHistoryLoadProgress` / `EndHistoryLoadProgress`. Failed-load provocation not run. |
+| 2b | Resize footer | Total Amount, Paid, PK, Bank Charges stay visible | PASS | After maximize/restore: status texts included `PK : 15`, `Paid Amount : 0`, `Bank Charges : 0`, `Total Amount : 20,068,696`. |
+| 2c | MultiSelect / Edit / Delete / Print | MultiSelect true; Ctrl/Shift multi; Edit disabled when >1; Delete+Print enabled | FAIL | Designer + `EnsureHistoryChrome` set `dlvHistory.MultiSelect = true` (confirmed). Runtime: list found, 41 rows; Ctrl+click attempted; context menu showed **Edit enabled=True** and **Print enabled=True** — Edit did not disable, so multi-row selection was not confirmed via UIA. Delete enablement not confirmed on menu. |
+| 2d | Sales columns | Charges visible; Car narrow; Discount narrow if present; Amount not crushed | PASS | Headers: `Car:w=39`; `Bank Charges:w=90`; `Amount:w=129`; Discount column absent (OK). |
 
 ## Sign-off
 
-S1 Build **FAIL** (ObjectListView HintPath missing; DLL not copied into repo). Login and history runtime checks **BLOCKED** / **FAIL** as above. Prior bootstrap/backup/cloud/once rows remain PASS from 4424b69 (not re-done). Old sample-app H1–H8 PASS values were **not** carried forward. Live/Client cutover was not opened.
+- Build **PASS** (exe Length 1420800). HintPath OK. deba308 ancestor OK.
+- Login **PASS** (frm_Login → main ERP on localhost/SB2).
+- History 2b **PASS**, 2d **PASS**; 2a **FAIL** (progress not observed); 2c **FAIL** (multi-select Edit-disable not confirmed at runtime).
+- Prior bootstrap/backup/cloud/once rows remain PASS from 4424b69 (not re-done).
+- Live/Client cutover was not opened.
+- Passwords and `*.ini` / `*.bak` stay out of git. Harness under `_uia_harness` / `_probe_ini` not committed. Working-tree bin/obj dirt left uncommitted.
 
-Passwords and `*.ini` / `*.bak` stay out of git. Working tree bin/obj dirt left uncommitted.
-
-**Next:** Agent pointed ObjectListView at `lib\ObjectListView.dll` and wired `tspbHistoryLoad`, the status-strip spring, MultiSelect, and Sales column widths on the imported `frm_Main`. Tester re-runs build, login (`frm_Login`, localhost / SB2), and history 2a–2d. These rows stay FAIL/BLOCKED until that run. Ask before any Live DB or Client PC cutover.
+**Next:** Investigate ToolStripProgressBar UIA visibility / longer show for 2a; drive genuine multi-row selection on ObjectListView so Edit disables for 2c. Ask before any Live DB or Client PC cutover.
