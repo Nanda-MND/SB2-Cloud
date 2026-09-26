@@ -12,6 +12,8 @@
 - `DataSync_10_SyncApply_Generic.sql` — UPDATE preserves `Deleted` / `IsDeleted` from JSON
 - `DataSync_06_Purchase.sql` — `SyncApply_PurchaseHead` passes `@Operation`
 - `SB.SyncAgent` — pass `@Operation` for Head applies
+- `DataSync_11_AllTables_Install.sql` and `DataSync_28_EnableC2L_Capture.sql` — `Deleted=0→1` enqueues Op=D on both sides. The metadata trigger must not replace that with Op=U. `tr_*_SoftDeleteSync` sets source `IsDeleted=1` and `DeletedAt` (marker `headSoftDeleteIsDeleted`).
+- `SB.SyncAgent` — C2L Detail Op=D treats a missing target row as success. Head Op=D must still find the row.
 
 ## Deploy
 

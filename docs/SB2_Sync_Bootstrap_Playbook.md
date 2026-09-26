@@ -42,7 +42,7 @@ Runners:
 2. `docs/sql/SB2_Run_Backup.ps1` — COPY_ONLY backup of Dev Local.
 3. `docs/sql/SB2_Run_TestCloudRestore.ps1` — restore that `.bak` onto Test Cloud only.
 4. `docs/sql/SB2_Run_CloudAfterRestore.ps1` — Test Cloud scripts. Does not install Local capture. Reseeds cloud transaction identities (including Fix_AllTxn-only tables), turns UserStatus and ListviewItem sync off, and closes restored Cloud L2C outbox copies.
-5. `docs/sql/SB2_Run_LocalPendingFix.ps1` — Local only, when Generic or UserStatus flags need a refresh without a full bootstrap. No identity reseed.
+5. `docs/sql/SB2_Run_LocalPendingFix.ps1` — Local only. Reinstalls entry L2C triggers (head soft-delete Op=D and source `IsDeleted=1`), refreshes Generic, and turns UserStatus/ListviewItem off. No identity reseed.
 6. `SB.SyncAgent/SB2_Dev_EncryptAndOnce.ps1` — encrypt Dev/Test ini, `/once`, optional service `SB2.SyncAgent.Dev`.
 
 Older `docs/sql/Deploy-*.cmd` launchers that pointed at SB1 or the production cloud host now exit through `SB2_RefuseLive.cmd`.

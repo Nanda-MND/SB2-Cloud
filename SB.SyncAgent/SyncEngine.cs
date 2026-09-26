@@ -259,9 +259,18 @@ namespace SB.SyncAgent
                 if (!applied && !conflictLogged)
                     throw new InvalidOperationException(proc + " did not apply row.");
 
+                // Detail Op=D is a physical DELETE. The row being gone is success.
+                // Head Op=D stays in the table (soft IsDeleted) and must still be found.
+                string operation = row["Operation"] == DBNull.Value
+                    ? ""
+                    : Convert.ToString(row["Operation"]).Trim();
+                bool detailHardDelete = string.Equals(operation, "D", StringComparison.OrdinalIgnoreCase)
+                    && table.EndsWith("Detail", StringComparison.OrdinalIgnoreCase);
+
                 // C2L must actually land on Local before Cloud outbox can be Synced.
                 if (c2l
                     && applied && !conflictLogged
+                    && !detailHardDelete
                     && !RowExistsForPrimaryKey(cnn, table, Convert.ToString(row["PrimaryKeyJson"])))
                 {
                     throw new InvalidOperationException(

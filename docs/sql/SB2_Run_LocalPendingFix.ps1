@@ -3,8 +3,10 @@
   Dev Local only (localhost / SB2). Does not reseed identities and does not
   requeue PurchaseHead deletes.
 
-  1) Redeploy SyncApply_Generic so Head Op=D soft-applies (int PK vs sql_variant).
-  2) Turn UserStatus and ListviewItem sync off and clear their pending outbox.
+  1) Refresh SyncInstall_Table and reinstall entry L2C triggers.
+     Head Deleted=1 enqueues Op=D, and the source row gets IsDeleted=1.
+  2) Redeploy SyncApply_Generic so Head Op=D soft-applies (int PK vs sql_variant).
+  3) Turn UserStatus and ListviewItem sync off and clear their pending outbox.
 
   Password: -Password or env SB2_DEV_LOCAL_SQL_PASSWORD. Never written to disk.
 #>
@@ -26,6 +28,8 @@ Assert-Sb2ResolvedEndpoint -Server $Server -Database $Database -User $User
 Assert-Sb2RealPassword -Password $Password
 
 $files = @(
+    'DataSync_11_AllTables_Install.sql',
+    'Fix_AllEntry_Local_L2C_Capture.sql',
     'DataSync_10_SyncApply_Generic.sql',
     'SB2_Disable_UserStatus_And_Listview_Sync.sql'
 )
