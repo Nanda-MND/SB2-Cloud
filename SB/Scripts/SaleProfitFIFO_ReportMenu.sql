@@ -1,0 +1,3 @@
+-- Report 1146 is not registered in the Reports menu.
+-- Gross Profit remains ReportID 1145 (frm_Preview uses SaleProfitFIFO_SP).
+-- Do not INSERT ReportName / UserRights for 1146.
