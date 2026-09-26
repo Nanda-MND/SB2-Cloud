@@ -81,7 +81,8 @@
       <SpecificVersion>False</SpecificVersion>
     </Reference>
     <Reference Include="ObjectListView">
-      <HintPath>..\..\777\777\bin\Debug\ObjectListView.dll</HintPath>
+      <HintPath>..\lib\ObjectListView.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

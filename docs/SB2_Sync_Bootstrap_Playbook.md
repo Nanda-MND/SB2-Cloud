@@ -223,7 +223,7 @@ SB.SyncStatus/
 SB/FastListViewHelper.cs          # recover if missing — required
 SB/frm_Main.cs + .Designer.cs     # history bind, footer, progress, columns
 SB/frm_List.cs (+ related list forms using helper)
-lib/ObjectListView.dll            # or packages path; fix csproj HintPath
+lib/ObjectListView.dll            # SB.csproj HintPath is ..\lib\ObjectListView.dll
 docs/sql/DataSync_01_Schema.sql
 docs/sql/DataSync_04_SoftDelete_Migration.sql
 docs/sql/DataSync_10_SyncApply_Generic.sql

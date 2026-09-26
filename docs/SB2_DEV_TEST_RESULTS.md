@@ -61,4 +61,4 @@ S1 Build **FAIL** (ObjectListView HintPath missing; DLL not copied into repo). L
 
 Passwords and `*.ini` / `*.bak` stay out of git. Working tree bin/obj dirt left uncommitted.
 
-**Next:** Place `ObjectListView.dll` at the HintPath outside the repo (or change HintPath via a committed csproj fix), rebuild, then re-run login + history on new frm_Main. Ask before any Live DB or Client PC cutover.
+**Next:** Agent pointed ObjectListView at `lib\ObjectListView.dll` and wired `tspbHistoryLoad`, the status-strip spring, MultiSelect, and Sales column widths on the imported `frm_Main`. Tester re-runs build, login (`frm_Login`, localhost / SB2), and history 2a–2d. These rows stay FAIL/BLOCKED until that run. Ask before any Live DB or Client PC cutover.

@@ -202,9 +202,9 @@ namespace SB
             // tssLeft
             // 
             this.tssLeft.Name = "tssLeft";
-            this.tssLeft.Size = new System.Drawing.Size(201, 43);
+            this.tssLeft.Size = new System.Drawing.Size(24, 43);
             this.tssLeft.Spring = true;
-            this.tssLeft.Text = "                               ";
+            this.tssLeft.Text = "";
             // 
             // tssNew
             // 
@@ -242,10 +242,11 @@ namespace SB
             this.toolStripStatusLabel3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(40)))), ((int)(((byte)(30)))), ((int)(((byte)(70)))));
             this.toolStripStatusLabel3.Font = new System.Drawing.Font("Pyidaungsu", 14.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.toolStripStatusLabel3.ForeColor = System.Drawing.Color.White;
+            this.toolStripStatusLabel3.AutoSize = false;
             this.toolStripStatusLabel3.Name = "toolStripStatusLabel3";
-            this.toolStripStatusLabel3.Size = new System.Drawing.Size(550, 43);
-            this.toolStripStatusLabel3.Text = "                                                                                 " +
-    "                          ";
+            this.toolStripStatusLabel3.Size = new System.Drawing.Size(24, 43);
+            this.toolStripStatusLabel3.Spring = true;
+            this.toolStripStatusLabel3.Text = "";
             // 
             // tssbBalance
             // 
@@ -1517,7 +1518,7 @@ namespace SB
             this.dlvHistory.HideSelection = false;
             this.dlvHistory.Location = new System.Drawing.Point(0, 0);
             this.dlvHistory.Margin = new System.Windows.Forms.Padding(3, 8, 3, 8);
-            this.dlvHistory.MultiSelect = false;
+            this.dlvHistory.MultiSelect = true;
             this.dlvHistory.Name = "dlvHistory";
             this.dlvHistory.SelectAllOnControlA = false;
             this.dlvHistory.ShowFilterMenuOnRightClick = false;

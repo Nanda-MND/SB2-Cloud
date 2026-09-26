@@ -16,6 +16,8 @@ namespace SB
         Boolean show_left_panel = false, HideZero = false;
         String CustAging = String.Empty;
         Form frm;
+        private ToolStripProgressBar tspbHistoryLoad;
+        private ToolStripMenuItem cmsPrint;
         private static void MouseEnter(Button btn, EventArgs e)
         {
             btn.BackColor = Color.FromArgb(130, 60, 180); ;
@@ -46,6 +48,66 @@ namespace SB
         public frm_Main()
         {
             InitializeComponent();
+            EnsureHistoryChrome();
+        }
+
+        private void EnsureHistoryChrome()
+        {
+            if (tspbHistoryLoad == null && statusStrip1 != null)
+            {
+                tspbHistoryLoad = new ToolStripProgressBar();
+                tspbHistoryLoad.Name = "tspbHistoryLoad";
+                tspbHistoryLoad.Width = 140;
+                tspbHistoryLoad.Minimum = 0;
+                tspbHistoryLoad.Maximum = 100;
+                tspbHistoryLoad.Style = ProgressBarStyle.Continuous;
+                tspbHistoryLoad.Visible = false;
+                statusStrip1.Items.Insert(1, tspbHistoryLoad);
+            }
+
+            if (cmsPrint == null && cmsTransaction != null)
+            {
+                cmsPrint = new ToolStripMenuItem();
+                cmsPrint.Name = "cmsPrint";
+                cmsPrint.Text = "Print";
+                cmsPrint.Enabled = false;
+                cmsPrint.Click += cmsPrint_Click;
+                int deleteAt = cmsTransaction.Items.IndexOf(deleteToolStripMenuItem);
+                cmsTransaction.Items.Insert(deleteAt < 0 ? cmsTransaction.Items.Count : deleteAt + 1, cmsPrint);
+            }
+
+            dlvHistory.MultiSelect = true;
+            LayoutHistoryStatusSummary();
+        }
+
+        private void BeginHistoryLoadProgress()
+        {
+            if (tspbHistoryLoad == null)
+                return;
+            tspbHistoryLoad.Minimum = 0;
+            tspbHistoryLoad.Maximum = 100;
+            tspbHistoryLoad.Value = 30;
+            tspbHistoryLoad.Style = ProgressBarStyle.Continuous;
+            tspbHistoryLoad.Visible = true;
+            statusStrip1.Refresh();
+        }
+
+        private void EndHistoryLoadProgress()
+        {
+            if (tspbHistoryLoad == null)
+                return;
+            tspbHistoryLoad.Value = tspbHistoryLoad.Maximum;
+            tspbHistoryLoad.Visible = false;
+            tspbHistoryLoad.Value = 0;
+            statusStrip1.Refresh();
+        }
+
+        private void cmsPrint_Click(object sender, EventArgs e)
+        {
+            if (dlvHistory.SelectedItems.Count < 1)
+                return;
+            using (frm_PrintSelect dlg = new frm_PrintSelect())
+                dlg.ShowDialog(this);
         }
 
         private void splitContainer2_Panel2_Paint(object sender, PaintEventArgs e)
@@ -1113,6 +1175,9 @@ namespace SB
 
 
             this.Cursor = Cursors.WaitCursor;
+            BeginHistoryLoadProgress();
+            try
+            {
             dwh = " 1 = 1";
             GetFilter();
 
@@ -1504,9 +1569,14 @@ namespace SB
             HideHistoryHelperColumns();
 
             FitHistoryColumnsToView();
+            ApplySalesHistoryColumnWidths();
             LayoutHistoryStatusSummary();
-
-            this.Cursor = Cursors.Default;
+            }
+            finally
+            {
+                EndHistoryLoadProgress();
+                this.Cursor = Cursors.Default;
+            }
         }
 
         /// <summary>Hide internal columns that duplicate visible ones (Amount vs FAmount, etc.).</summary>
@@ -1528,6 +1598,31 @@ namespace SB
                     dlvHistory.Columns["FAmount"].Text == "FAmount")
                     dlvHistory.Columns["FAmount"].Text = "Amount";
             }
+        }
+
+        /// <summary>Sales: Charges stays visible, Car/Discount stay narrow, visible Amount (FAmount) is not scaled away.</summary>
+        private void ApplySalesHistoryColumnWidths()
+        {
+            if (dlvHistory == null || LocalData.Menu != LocalData.myMenu.Sale)
+                return;
+            SetHistoryColumnWidth("Car", 55);
+            if (dlvHistory.Columns["Discount"] != null)
+                SetHistoryColumnWidth("Discount", 70);
+            if (dlvHistory.Columns["Charges"] != null)
+            {
+                if (dlvHistory.Columns["Charges"].Width < 90)
+                    SetHistoryColumnWidth("Charges", 90);
+                dlvHistory.Columns["Charges"].TextAlign = HorizontalAlignment.Right;
+            }
+            if (dlvHistory.Columns["FAmount"] != null && dlvHistory.Columns["FAmount"].Width < 110)
+                SetHistoryColumnWidth("FAmount", 110);
+        }
+
+        private void SetHistoryColumnWidth(string columnName, int width)
+        {
+            if (dlvHistory.Columns[columnName] == null)
+                return;
+            dlvHistory.Columns[columnName].Width = width;
         }
 
         /// <summary>Scale column widths so all Sales/history columns fit without horizontal clip when possible.</summary>
@@ -1566,7 +1661,14 @@ namespace SB
             if (tssLeft != null)
             {
                 tssLeft.Spring = true;
+                tssLeft.AutoSize = false;
                 tssLeft.Text = string.Empty;
+            }
+            if (toolStripStatusLabel3 != null)
+            {
+                toolStripStatusLabel3.Spring = true;
+                toolStripStatusLabel3.AutoSize = false;
+                toolStripStatusLabel3.Text = string.Empty;
             }
             if (tsLablePK != null)
                 tsLablePK.AutoSize = true;
@@ -1682,9 +1784,11 @@ namespace SB
         {
             int i;
 
-            if (dlvHistory.SelectedItems.Count <= 0)
+            if (dlvHistory.SelectedItems.Count != 1)
             {
-                MessageBox.Show("Select Voucher!");
+                MessageBox.Show(dlvHistory.SelectedItems.Count <= 0
+                    ? "Select Voucher!"
+                    : "Select one voucher to edit.");
                 return;
             }
 
@@ -2117,8 +2221,14 @@ namespace SB
             //}
             Boolean allow;
             Boolean.TryParse(DBConnection.roExecSQL("Select dbo.CheckUserPermission(" + LocalData.UserID.ToString() + ",2,"+((int)LocalData.Menu).ToString()+",2)").ToString(), out allow);
+            int selected = dlvHistory.SelectedItems == null ? 0 : dlvHistory.SelectedItems.Count;
             deleteToolStripMenuItem.Visible = allow;
-            deleteToolStripMenuItem.Enabled = allow;
+            deleteToolStripMenuItem.Enabled = allow && selected >= 1;
+            tsDelete.Enabled = allow && selected >= 1;
+            cmsEdit.Enabled = selected == 1;
+            tssEdit.Enabled = selected == 1;
+            if (cmsPrint != null)
+                cmsPrint.Enabled = selected >= 1;
         }
 
         private void pmAcctOpening_MouseSelected(object sender, EventArgs e)
@@ -2331,7 +2441,11 @@ namespace SB
 
         private void dlvHistory_SelectedIndexChanged(object sender, EventArgs e)
         {
-
+            int selected = dlvHistory.SelectedItems == null ? 0 : dlvHistory.SelectedItems.Count;
+            tssEdit.Enabled = selected == 1;
+            cmsEdit.Enabled = selected == 1;
+            if (cmsPrint != null)
+                cmsPrint.Enabled = selected >= 1;
         }
 
         private void todayToolStripMenuItem_Click(object sender, EventArgs e)

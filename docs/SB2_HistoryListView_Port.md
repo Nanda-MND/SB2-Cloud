@@ -27,7 +27,7 @@ SB Main history (`dlvHistory` / FastObjectListView) was upgraded for:
 | `SB/frm_Main.Designer.cs` | `dlvHistory` (ObjectListView), `statusStrip1`, `tspbHistoryLoad`, footer labels (`tslbMachine`, `tsLabelPaid`, `tsLablePK`, `tslbBankCharges`, Spring label) |
 | `SB/frm_List.cs` (+ Designer) | Popup list uses same helper |
 | `SB/frm_Setup.cs` / `frm_CodeList.cs` | Other ObjectListView binds using helper |
-| `SB/SB.csproj` | Reference `ObjectListView.dll` (fix HintPath for SB2-Cloud; prefer `packages/` or `lib/ObjectListView.dll` in-repo) |
+| `SB/SB.csproj` | `ObjectListView` HintPath is `..\lib\ObjectListView.dll` (in this repo). Do not use `D:\Project\777\...`. |
 | `docs/sql/Sales_Listview_NarrowCarDiscount.sql` | Dev Local (+ Test Cloud after restore) `ListviewItem` width updates for Sales |
 
 ### Related docs
