@@ -1,4 +1,0 @@
-﻿L2C_Pending	C2L_Pending	Syncing    	DeadLetter 
------------	-----------	-----------	-----------
-          0	          0	          0	          0
-
