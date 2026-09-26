@@ -145,3 +145,91 @@ Owner instruction: fresh restore skipped; current Test Cloud `sql8006 / db_abe8c
 
 **OVERALL: PASS** (checks a-d all pass).
 
+
+## E2E edit/delete sync (real row mutations) — 2026-09-26 21:23:39 Asia/Rangoon
+
+Tester on Nanda-HP. HEAD during run: `4debcfb`. Marker: `E2E_20260926_211739`. Runtime `D:\Dev\SB2-Cloud-Runtime\`; `SB.SyncAgent.exe /once` only (no EncryptAndOnce rebuild). Targets: Local `localhost/SB2` + Cloud `sql8006/db_abe8c0_sb2` only. UserStatus/ListViewItem remained `0/0/0`; UserRights Local `1/1/0` Cloud `1/0/0`.
+
+Existing scripts consulted (not re-deployed): `docs/sql/README_EditDelete_Sync_Deploy.md`, `README_Head_SoftDelete_Sync.md`, `README_Detail_HardDelete_Sync.md`, `README_TxnDetail_HardDeleteSync.md`. SyncApply_Generic markers both sides: hardDeleteDetail=OK, preserve-soft-delete-flags=OK.
+
+### Matrix
+
+| Cell | Result | Evidence |
+|------|--------|----------|
+| L2C Edit (SaleHead non-key) | **PASS** | Local UPDATE `SaleHead.ID=45637` Remark→`E2E_20260926_211739_L2C_EDIT`; Outbox L2C Op=U Pending; /once; Cloud Remark matched; Pending=0 |
+| L2C Detail hard-delete | **PASS** | Local DELETE `SaleDetail.ID=91987` (RefID=45636, Amount=0 disposable); Outbox L2C Op=D; /once; Cloud ABSENT; head detail count 4→3 both sides |
+| L2C Head soft-delete | **PASS** | Local `UPDATE SaleHead SET Deleted=1` ID=45633 (product Deleted path); Outbox L2C Op=**U** (not D); /once; Cloud PRESENT with Deleted=1,IsDeleted=1 (not physically gone). Source Local left IsDeleted=0 |
+| C2L Edit | **PASS** | Cloud UPDATE `SaleHead.ID=45635` Remark→`E2E_20260926_211739_C2L_EDIT`; Outbox C2L Op=U; /once; Local Remark matched |
+| C2L Detail hard-delete | **PASS** | Cloud DELETE `SaleDetail.ID=91986` (RefID=45636); Outbox C2L Op=D; /once; Local ABSENT; count 3→2 both sides. **Note:** Cloud OutboxID 493 remains Pending with error `Applied but row missing on Local for SaleDetail` after successful hard delete (verification bug) |
+| C2L Head soft-delete | **PASS** | Cloud `UPDATE SaleHead SET Deleted=1` ID=45634; Outbox C2L Op=**D**; /once; Local PRESENT with Deleted=1,IsDeleted=1. Source Cloud left IsDeleted=0 |
+
+### SKIP
+
+| Item | Reason |
+|------|--------|
+| Cloud-zone ID (≥2e9) Sale/Purchase heads | None present on Test Cloud; used high local-zone shared IDs that exist both sides |
+| PurchaseHead/PurchaseDetail cells | Sale* covered all six cells; Purchase not required once Sale matrix complete |
+| EncryptAndOnce rebuild | Prefer /once; runtime ini already encrypted |
+
+### FAIL list
+
+_(none for matrix cells)_
+
+Residual non-matrix issue (do not invent as matrix FAIL): Cloud C2L Pending=1 (SaleDetail 91986 Op=D) after hard-delete already applied — SyncAgent/SyncApply post-apply check treats missing detail row as error on Op=D.
+
+### Suggested Agent fix bullets
+
+1. **Hard-delete Op=D verify:** After `SyncApply_Generic` hard-deletes `*Detail`, SyncAgent must treat target row ABSENT as success, not `Applied but row missing` / leave Pending (Cloud OutboxID 493 / SaleDetail 91986).
+2. **Head soft-delete capture asymmetry:** Local `Deleted=0→1` enqueued SaleHead Op=**U**; Cloud same path enqueued Op=**D**. Align SoftDelete/outbox triggers so both sides emit Op=D for head soft-delete (per README_Head_SoftDelete_Sync).
+3. **`tr_*Head_SoftDeleteSync`:** On both Local and Cloud, updating `Deleted=1` left source `IsDeleted=0` (DeletedAt NULL). Trigger should set `IsDeleted=1` on source; target currently gets IsDeleted via apply/path — source/target flags should match without relying on the other side.
+
+### Sign-off (this E2E)
+
+- Matrix: **6/6 PASS**, 0 FAIL, SKIPs documented.
+- Do not Live/Client cutover from this alone; residual Cloud Pending Op=D verify bug remains.
+- Evidence folder (not in git): `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\`
+- Written: 2026-09-26 21:23:39 Asia/Rangoon
+
+## E2E edit/delete sync (real row mutations) — 2026-09-26 21:24:32 Asia/Rangoon
+
+Tester on Nanda-HP. HEAD during run: `4debcfb`. E2E_20260926_211739: `E2E_20260926_211739`. Runtime `D:\Dev\SB2-Cloud-Runtime\`; `SB.SyncAgent.exe /once` only (no EncryptAndOnce rebuild). Targets: Local `localhost/SB2` + Cloud `sql8006/db_abe8c0_sb2` only. UserStatus/ListViewItem remained `0/0/0`; UserRights Local `1/1/0` Cloud `1/0/0`.
+
+Existing scripts consulted (not re-deployed): `docs/sql/README_EditDelete_Sync_Deploy.md`, `README_Head_SoftDelete_Sync.md`, `README_Detail_HardDelete_Sync.md`, `README_TxnDetail_HardDeleteSync.md`. SyncApply_Generic E2E_20260926_211739s both sides: hardDeleteDetail=OK, preserve-soft-delete-flags=OK.
+
+### Matrix
+
+| Cell | Result | Evidence |
+|------|--------|----------|
+| L2C Edit (SaleHead non-key) | **PASS** | Local UPDATE `SaleHead.ID=45637` Remark to E2E_20260926_211739_L2C_EDIT; Outbox L2C Op=U Pending; /once; Cloud Remark matched; Pending=0 |
+| L2C Detail hard-delete | **PASS** | Local DELETE `SaleDetail.ID=91987` (RefID=45636, Amount=0 disposable); Outbox L2C Op=D; /once; Cloud ABSENT; head detail count 4 to 3 both sides |
+| L2C Head soft-delete | **PASS** | Local `UPDATE SaleHead SET Deleted=1` ID=45633 (product Deleted path); Outbox L2C Op=**U** (not D); /once; Cloud PRESENT with Deleted=1,IsDeleted=1 (not physically gone). Source Local left IsDeleted=0 |
+| C2L Edit | **PASS** | Cloud UPDATE `SaleHead.ID=45635` Remark to E2E_20260926_211739_C2L_EDIT; Outbox C2L Op=U; /once; Local Remark matched |
+| C2L Detail hard-delete | **PASS** | Cloud DELETE `SaleDetail.ID=91986` (RefID=45636); Outbox C2L Op=D; /once; Local ABSENT; count 3 to 2 both sides. **Note:** Cloud OutboxID 493 remains Pending with error Applied-but-row-missing on Local after successful hard delete (verification bug) |
+| C2L Head soft-delete | **PASS** | Cloud `UPDATE SaleHead SET Deleted=1` ID=45634; Outbox C2L Op=**D**; /once; Local PRESENT with Deleted=1,IsDeleted=1. Source Cloud left IsDeleted=0 |
+
+### SKIP
+
+| Item | Reason |
+|------|--------|
+| Cloud-zone ID (>=2e9) Sale/Purchase heads | None present on Test Cloud; used high local-zone shared IDs that exist both sides |
+| PurchaseHead/PurchaseDetail cells | Sale* covered all six cells; Purchase not required once Sale matrix complete |
+| EncryptAndOnce rebuild | Prefer /once; runtime ini already encrypted |
+
+### FAIL list
+
+(none for matrix cells)
+
+Residual non-matrix issue (do not invent as matrix FAIL): Cloud C2L Pending=1 (SaleDetail 91986 Op=D) after hard-delete already applied — SyncAgent/SyncApply post-apply check treats missing detail row as error on Op=D.
+
+### Suggested Agent fix bullets
+
+1. **Hard-delete Op=D verify:** After SyncApply_Generic hard-deletes *Detail, SyncAgent must treat target row ABSENT as success, not Applied-but-row-missing / leave Pending (Cloud OutboxID 493 / SaleDetail 91986).
+2. **Head soft-delete capture asymmetry:** Local Deleted 0 to 1 enqueued SaleHead Op=U; Cloud same path enqueued Op=D. Align SoftDelete/outbox triggers so both sides emit Op=D for head soft-delete (per README_Head_SoftDelete_Sync).
+3. **tr_*Head_SoftDeleteSync:** On both Local and Cloud, updating Deleted=1 left source IsDeleted=0 (DeletedAt NULL). Trigger should set IsDeleted=1 on source; target currently gets IsDeleted via apply — source/target flags should match without relying on the other side.
+
+### Sign-off (this E2E)
+
+- Matrix: **6/6 PASS**, 0 FAIL, SKIPs documented.
+- Do not Live/Client cutover from this alone; residual Cloud Pending Op=D verify bug remains.
+- Evidence folder (not in git): `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\`
+- Written: 2026-09-26 21:24:32 Asia/Rangoon
