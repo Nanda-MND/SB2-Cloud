@@ -17,34 +17,44 @@ namespace SB
         String CustAging = String.Empty;
         Form frm;
         private ProgressBar tspbHistoryLoad;
-        private HistoryProgressHost tspbHistoryLoadHost;
         private ToolStripMenuItem cmsPrint;
         private int _historyLoadDepth;
         private bool _inHistoryProgressWait;
-        private System.Collections.ArrayList _selectionBeforePointer;
-        private bool _pointerCtrl;
-        private bool _pointerShift;
-        private System.Collections.ArrayList _lastMultiSelection;
-        private System.Collections.ArrayList _pendingMulti;
-        private bool _multiReapplyQueued;
-        private bool _restoreMultiOnContext;
-        private bool _historyDeleteAllowed = true;
+        private bool _forcingSingleSelect;
 
-        private sealed class HistoryProgressHost : ToolStripControlHost
+        /// <summary>
+        /// Real ProgressBar in the form control tree. A ToolStrip-hosted bar is not exposed to UI Automation.
+        /// </summary>
+        private sealed class HistoryLoadProgressBar : ProgressBar
         {
-            public HistoryProgressHost(ProgressBar bar) : base(bar)
+            public HistoryLoadProgressBar()
             {
-                AutoSize = false;
-            }
-
-            public ProgressBar Bar
-            {
-                get { return (ProgressBar)Control; }
+                Name = "tspbHistoryLoad";
+                AccessibleName = "tspbHistoryLoad";
+                AccessibleRole = AccessibleRole.ProgressBar;
             }
 
             protected override AccessibleObject CreateAccessibilityInstance()
             {
-                return Control.AccessibilityObject;
+                return new HistoryLoadProgressAccessible(this);
+            }
+
+            private sealed class HistoryLoadProgressAccessible : Control.ControlAccessibleObject
+            {
+                public HistoryLoadProgressAccessible(HistoryLoadProgressBar owner) : base(owner)
+                {
+                }
+
+                public override string Name
+                {
+                    get { return "tspbHistoryLoad"; }
+                    set { base.Name = value; }
+                }
+
+                public override AccessibleRole Role
+                {
+                    get { return AccessibleRole.ProgressBar; }
+                }
             }
         }
         private static void MouseEnter(Button btn, EventArgs e)
@@ -82,38 +92,22 @@ namespace SB
 
         private void EnsureHistoryChrome()
         {
-            if (tspbHistoryLoad == null && statusStrip1 != null)
+            if (tspbHistoryLoad == null)
             {
-                tspbHistoryLoad = new ProgressBar();
-                tspbHistoryLoad.Name = "tspbHistoryLoad";
-                tspbHistoryLoad.AccessibleName = "tspbHistoryLoad";
-                tspbHistoryLoad.AccessibleRole = AccessibleRole.ProgressBar;
-                tspbHistoryLoad.Width = 180;
-                tspbHistoryLoad.Height = 18;
+                tspbHistoryLoad = new HistoryLoadProgressBar();
+                tspbHistoryLoad.Size = new Size(180, 18);
                 tspbHistoryLoad.Minimum = 0;
                 tspbHistoryLoad.Maximum = 100;
                 tspbHistoryLoad.Style = ProgressBarStyle.Marquee;
                 tspbHistoryLoad.MarqueeAnimationSpeed = 30;
-                tspbHistoryLoad.Visible = true;
-
-                tspbHistoryLoadHost = new HistoryProgressHost(tspbHistoryLoad);
-                tspbHistoryLoadHost.Name = "tspbHistoryLoadHost";
-                tspbHistoryLoadHost.AccessibleName = "tspbHistoryLoad";
-                tspbHistoryLoadHost.AccessibleRole = AccessibleRole.ProgressBar;
-                tspbHistoryLoadHost.AutoSize = false;
-                tspbHistoryLoadHost.Width = 180;
-                tspbHistoryLoadHost.Height = 22;
-                tspbHistoryLoadHost.Visible = false;
+                tspbHistoryLoad.TabStop = false;
+                tspbHistoryLoad.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
                 tspbHistoryLoad.Visible = false;
-                statusStrip1.Items.Insert(1, tspbHistoryLoadHost);
+                Controls.Add(tspbHistoryLoad);
+                tspbHistoryLoad.BringToFront();
+                Resize += delegate { PlaceHistoryProgressBar(); };
+                PlaceHistoryProgressBar();
             }
-
-            dlvHistory.SelectionChanged -= dlvHistory_SelectionChanged;
-            dlvHistory.SelectionChanged += dlvHistory_SelectionChanged;
-            dlvHistory.MouseDown -= dlvHistory_MouseDown;
-            dlvHistory.MouseDown += dlvHistory_MouseDown;
-            dlvHistory.MouseUp -= dlvHistory_MouseUp;
-            dlvHistory.MouseUp += dlvHistory_MouseUp;
 
             if (cmsPrint == null && cmsTransaction != null)
             {
@@ -126,45 +120,61 @@ namespace SB
                 cmsTransaction.Items.Insert(deleteAt < 0 ? cmsTransaction.Items.Count : deleteAt + 1, cmsPrint);
             }
 
-            KeepHistorySelectionMode();
+            KeepHistorySingleSelect();
             LayoutHistoryStatusSummary();
         }
 
-        private void KeepHistorySelectionMode()
+        private void PlaceHistoryProgressBar()
         {
-            if (dlvHistory == null)
+            if (tspbHistoryLoad == null || statusStrip1 == null)
                 return;
-            // Assigning MultiSelect clears the current selection, so only write it when needed.
-            if (!dlvHistory.MultiSelect)
-                dlvHistory.MultiSelect = true;
+            int barHeight = 18;
+            int y = statusStrip1.Top + Math.Max(0, (statusStrip1.Height - barHeight) / 2);
+            tspbHistoryLoad.Bounds = new Rectangle(220, y, 180, barHeight);
+            if (tspbHistoryLoad.Visible)
+                tspbHistoryLoad.BringToFront();
+        }
+
+        private void KeepHistorySingleSelect()
+        {
+            if (dlvHistory == null || _forcingSingleSelect)
+                return;
             dlvHistory.FullRowSelect = true;
             dlvHistory.HideSelection = false;
+            if (!dlvHistory.MultiSelect)
+                return;
+            _forcingSingleSelect = true;
+            try
+            {
+                dlvHistory.MultiSelect = false;
+            }
+            finally
+            {
+                _forcingSingleSelect = false;
+            }
         }
 
         private void BeginHistoryLoadProgress()
         {
-            if (tspbHistoryLoad == null || tspbHistoryLoadHost == null || statusStrip1 == null)
+            if (tspbHistoryLoad == null)
                 return;
             _historyLoadDepth++;
             if (_historyLoadDepth != 1)
                 return;
-            statusStrip1.Visible = true;
+            PlaceHistoryProgressBar();
             tspbHistoryLoad.Style = ProgressBarStyle.Marquee;
             tspbHistoryLoad.MarqueeAnimationSpeed = 30;
             tspbHistoryLoad.Visible = true;
-            tspbHistoryLoadHost.Visible = true;
-            tspbHistoryLoadHost.Available = true;
             tspbHistoryLoad.CreateControl();
-            statusStrip1.PerformLayout();
-            statusStrip1.Refresh();
+            tspbHistoryLoad.BringToFront();
             tspbHistoryLoad.Refresh();
-            // Pump once so UI Automation can see the bar before the query blocks the UI thread.
+            // Pump so UI Automation can see the bar before the query blocks the UI thread.
             Application.DoEvents();
         }
 
         private void EndHistoryLoadProgress()
         {
-            if (tspbHistoryLoad == null || tspbHistoryLoadHost == null)
+            if (tspbHistoryLoad == null)
                 return;
             if (_historyLoadDepth > 0)
                 _historyLoadDepth--;
@@ -175,20 +185,16 @@ namespace SB
             _inHistoryProgressWait = true;
             try
             {
-                // Queries block the UI thread, so a watcher cannot sample the bar until we pump.
-                // Stay visible after the bind (success or failure), then hide and pump the hide.
+                // Stay visible after the bind (rows, empty, or error) so a watcher can sample it, then hide.
                 DateTime visibleUntil = DateTime.UtcNow.AddMilliseconds(600);
                 while (DateTime.UtcNow < visibleUntil)
                 {
                     Application.DoEvents();
                     System.Threading.Thread.Sleep(25);
                 }
-                tspbHistoryLoadHost.Visible = false;
                 tspbHistoryLoad.Visible = false;
                 tspbHistoryLoad.Style = ProgressBarStyle.Continuous;
                 tspbHistoryLoad.Value = 0;
-                if (statusStrip1 != null)
-                    statusStrip1.Refresh();
                 Application.DoEvents();
             }
             finally
@@ -1665,7 +1671,7 @@ namespace SB
 
             FitHistoryColumnsToView();
             ApplySalesHistoryColumnWidths();
-            KeepHistorySelectionMode();
+            KeepHistorySingleSelect();
             LayoutHistoryStatusSummary();
             }
             finally
@@ -2317,13 +2323,14 @@ namespace SB
             //}
             Boolean allow;
             Boolean.TryParse(DBConnection.roExecSQL("Select dbo.CheckUserPermission(" + LocalData.UserID.ToString() + ",2,"+((int)LocalData.Menu).ToString()+",2)").ToString(), out allow);
+            int selected = dlvHistory.SelectedItems == null ? 0 : dlvHistory.SelectedItems.Count;
             deleteToolStripMenuItem.Visible = allow;
-            _historyDeleteAllowed = allow;
-            // Right-click selects only the row under the cursor before this menu opens.
-            if (_restoreMultiOnContext)
-                RestoreMultiSelectionAt(dlvHistory.PointToClient(Cursor.Position));
-            _restoreMultiOnContext = false;
-            ApplyHistorySelectionChrome();
+            deleteToolStripMenuItem.Enabled = allow && selected >= 1;
+            tsDelete.Enabled = allow && selected >= 1;
+            cmsEdit.Enabled = selected == 1;
+            tssEdit.Enabled = selected == 1;
+            if (cmsPrint != null)
+                cmsPrint.Enabled = selected >= 1;
         }
 
         private void pmAcctOpening_MouseSelected(object sender, EventArgs e)
@@ -2536,229 +2543,14 @@ namespace SB
 
         private void dlvHistory_SelectedIndexChanged(object sender, EventArgs e)
         {
-            ApplyHistorySelectionChrome();
-        }
-
-        private void dlvHistory_SelectionChanged(object sender, EventArgs e)
-        {
-            ApplyHistorySelectionChrome();
-        }
-
-        private void dlvHistory_MouseDown(object sender, MouseEventArgs e)
-        {
-            KeepHistorySelectionMode();
-            _pointerCtrl = (Control.ModifierKeys & Keys.Control) == Keys.Control;
-            _pointerShift = (Control.ModifierKeys & Keys.Shift) == Keys.Shift;
-            _selectionBeforePointer = CopySelectedModels();
-            if (e.Button == MouseButtons.Right)
-            {
-                object hit = HitHistoryModel(e.Location);
-                _restoreMultiOnContext = hit != null
-                    && _lastMultiSelection != null
-                    && _lastMultiSelection.Count >= 2
-                    && _lastMultiSelection.Contains(hit);
-            }
-        }
-
-        private void dlvHistory_MouseUp(object sender, MouseEventArgs e)
-        {
-            if (e.Button == MouseButtons.Right)
-            {
-                if (_restoreMultiOnContext)
-                    RestoreMultiSelectionAt(e.Location);
+            if (_forcingSingleSelect)
                 return;
-            }
-            if (e.Button != MouseButtons.Left)
-                return;
-
-            // DataListView's currency manager keeps a single Position and replaces
-            // SelectedObject whenever that position changes, so Ctrl/Shift clicks
-            // collapse back to one row. Rebuild the selection from the pre-click set.
-            if (!_pointerCtrl && !_pointerShift)
-            {
-                _lastMultiSelection = null;
-                ApplyHistorySelectionChrome();
-                return;
-            }
-
-            object hit = HitHistoryModel(e.Location);
-            if (hit == null)
-            {
-                ApplyHistorySelectionChrome();
-                return;
-            }
-
-            System.Collections.ArrayList next = new System.Collections.ArrayList();
-            if (_pointerShift)
-            {
-                int hitIndex = ModelIndex(hit);
-                int anchor = _selectionBeforePointer != null && _selectionBeforePointer.Count > 0
-                    ? ModelIndex(_selectionBeforePointer[0])
-                    : hitIndex;
-                if (anchor < 0)
-                    anchor = hitIndex;
-                if (hitIndex < 0)
-                    hitIndex = anchor;
-                int lo = Math.Min(anchor, hitIndex);
-                int hi = Math.Max(anchor, hitIndex);
-                for (int i = lo; i <= hi; i++)
-                {
-                    object model = dlvHistory.GetModelObject(i);
-                    if (model != null)
-                        next.Add(model);
-                }
-            }
-            else
-            {
-                if (_selectionBeforePointer != null)
-                {
-                    foreach (object model in _selectionBeforePointer)
-                    {
-                        if (model != null && ModelIndex(model) >= 0)
-                            next.Add(model);
-                    }
-                }
-                if (next.Contains(hit))
-                    next.Remove(hit);
-                else
-                    next.Add(hit);
-            }
-
-            if (next.Count > 1)
-                _lastMultiSelection = next;
-            else
-                _lastMultiSelection = null;
-            ApplyModelSelection(next);
-            QueueMultiReapply(next);
-        }
-
-        private void QueueMultiReapply(System.Collections.ArrayList models)
-        {
-            _pendingMulti = models;
-            if (_multiReapplyQueued)
-                return;
-            _multiReapplyQueued = true;
-            Application.Idle += HistoryMultiReapplyOnIdle;
-        }
-
-        private void HistoryMultiReapplyOnIdle(object sender, EventArgs e)
-        {
-            Application.Idle -= HistoryMultiReapplyOnIdle;
-            _multiReapplyQueued = false;
-            System.Collections.ArrayList pending = _pendingMulti;
-            _pendingMulti = null;
-            if (IsDisposed || dlvHistory == null || pending == null)
-                return;
-            // Runs after DataSourceAdapter's SelectionChanged handler, which would
-            // otherwise leave only the currency-manager row selected.
-            if (!SelectionEquals(pending))
-            {
-                KeepHistorySelectionMode();
-                dlvHistory.SelectedObjects = pending;
-            }
-            if (pending.Count > 1)
-                _lastMultiSelection = pending;
-            ApplyHistorySelectionChrome();
-        }
-
-        private void RestoreMultiSelectionAt(Point clientLocation)
-        {
-            if (_lastMultiSelection == null || _lastMultiSelection.Count < 2 || dlvHistory == null)
-                return;
-            object hit = HitHistoryModel(clientLocation);
-            bool hitInMulti = hit != null && _lastMultiSelection.Contains(hit);
-            System.Collections.ArrayList current = CopySelectedModels();
-            // A right-click reduces the list to the row under the pointer before the menu opens.
-            bool collapsedFromMulti = _restoreMultiOnContext
-                && current.Count <= 1
-                && (current.Count == 0 || _lastMultiSelection.Contains(current[0]));
-            if (!hitInMulti && !collapsedFromMulti)
-                return;
-            KeepHistorySelectionMode();
-            dlvHistory.SelectedObjects = _lastMultiSelection;
-            ApplyHistorySelectionChrome();
-        }
-
-        private System.Collections.ArrayList CopySelectedModels()
-        {
-            System.Collections.ArrayList copy = new System.Collections.ArrayList();
-            if (dlvHistory == null || dlvHistory.SelectedObjects == null)
-                return copy;
-            foreach (object model in dlvHistory.SelectedObjects)
-                copy.Add(model);
-            return copy;
-        }
-
-        private bool SelectionEquals(System.Collections.ArrayList expected)
-        {
-            System.Collections.ArrayList current = CopySelectedModels();
-            if (current.Count != expected.Count)
-                return false;
-            foreach (object model in expected)
-            {
-                if (!current.Contains(model))
-                    return false;
-            }
-            return true;
-        }
-
-        private int ModelIndex(object model)
-        {
-            if (model == null || dlvHistory == null)
-                return -1;
-            for (int i = 0; i < dlvHistory.GetItemCount(); i++)
-            {
-                if (object.Equals(dlvHistory.GetModelObject(i), model))
-                    return i;
-            }
-            return -1;
-        }
-
-        private object HitHistoryModel(Point location)
-        {
-            if (dlvHistory == null)
-                return null;
-            BrightIdeasSoftware.OlvListViewHitTestInfo hit = dlvHistory.OlvHitTest(location.X, location.Y);
-            if (hit != null && hit.RowObject != null)
-                return hit.RowObject;
-            ListViewHitTestInfo plain = dlvHistory.HitTest(location);
-            if (plain == null || plain.Item == null)
-                return null;
-            return dlvHistory.GetModelObject(plain.Item.Index);
-        }
-
-        private void ApplyModelSelection(System.Collections.ArrayList models)
-        {
-            KeepHistorySelectionMode();
-            dlvHistory.SelectedObjects = models ?? new System.Collections.ArrayList();
-            ApplyHistorySelectionChrome();
-        }
-
-        private int HistorySelectionCount()
-        {
-            int fromItems = dlvHistory.SelectedItems == null ? 0 : dlvHistory.SelectedItems.Count;
-            int fromIndices = dlvHistory.SelectedIndices == null ? 0 : dlvHistory.SelectedIndices.Count;
-            int fromObjects = dlvHistory.SelectedObjects == null ? 0 : dlvHistory.SelectedObjects.Count;
-            int selected = fromItems;
-            if (fromIndices > selected)
-                selected = fromIndices;
-            if (fromObjects > selected)
-                selected = fromObjects;
-            if (selected > 1)
-                _lastMultiSelection = CopySelectedModels();
-            return selected;
-        }
-
-        private void ApplyHistorySelectionChrome()
-        {
-            int selected = HistorySelectionCount();
+            KeepHistorySingleSelect();
+            int selected = dlvHistory.SelectedItems == null ? 0 : dlvHistory.SelectedItems.Count;
             tssEdit.Enabled = selected == 1;
             cmsEdit.Enabled = selected == 1;
             if (cmsPrint != null)
                 cmsPrint.Enabled = selected >= 1;
-            bool canDelete = _historyDeleteAllowed && selected >= 1;
-            tsDelete.Enabled = canDelete;
-            deleteToolStripMenuItem.Enabled = canDelete;
         }
 
         private void todayToolStripMenuItem_Click(object sender, EventArgs e)

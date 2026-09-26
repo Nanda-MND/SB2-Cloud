@@ -1518,7 +1518,7 @@ namespace SB
             this.dlvHistory.HideSelection = false;
             this.dlvHistory.Location = new System.Drawing.Point(0, 0);
             this.dlvHistory.Margin = new System.Windows.Forms.Padding(3, 8, 3, 8);
-            this.dlvHistory.MultiSelect = true;
+            this.dlvHistory.MultiSelect = false;
             this.dlvHistory.Name = "dlvHistory";
             this.dlvHistory.SelectAllOnControlA = false;
             this.dlvHistory.ShowFilterMenuOnRightClick = false;
