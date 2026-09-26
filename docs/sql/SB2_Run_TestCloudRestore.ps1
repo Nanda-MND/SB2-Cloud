@@ -9,14 +9,14 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$Server,
-    [Parameter(Mandatory = $true)][string]$Database,
-    [Parameter(Mandatory = $true)][string]$User,
+    [string]$Server = 'sql8006.site4now.net',
+    [string]$Database = 'db_abe8c0_sb2',
+    [string]$User = 'db_abe8c0_sb2_admin',
     [string]$Password = $env:SB2_TEST_CLOUD_SQL_PASSWORD,
     [Parameter(Mandatory = $true)][string]$BackupPath,
     [Parameter(Mandatory = $true)][string]$DataFolder,
     [Parameter(Mandatory = $true)][string]$LogFolder,
-    [string]$DevLocalServer = '',
+    [string]$DevLocalServer = 'local\SB2',
     [string]$DevLocalDatabase = 'SB2',
     [switch]$AllowReplace
 )
@@ -29,9 +29,7 @@ $ErrorActionPreference = 'Stop'
 Assert-Sb2DevTestTarget -Server $Server -Database $Database -User $User -Role TestCloud
 Assert-Sb2ResolvedEndpoint -Server $Server -Database $Database -User $User
 Assert-Sb2NotDevLocalServer -Server $Server -Database $Database -DevLocalServer $DevLocalServer -DevLocalDatabase $DevLocalDatabase
-if ([string]::IsNullOrWhiteSpace($Password)) {
-    throw 'Test Cloud password is required via -Password or SB2_TEST_CLOUD_SQL_PASSWORD. Do not commit it.'
-}
+Assert-Sb2RealPassword -Password $Password
 if (-not (Test-Path -LiteralPath $BackupPath)) {
     throw "Backup file not found: $BackupPath"
 }
@@ -70,8 +68,11 @@ $conn = New-Object System.Data.SqlClient.SqlConnection $builder.ConnectionString
 try {
     $conn.Open()
     $srv = [string](Invoke-Sb2Table -Connection $conn -Sql 'SELECT CONVERT(nvarchar(256), @@SERVERNAME) AS Srv;').Rows[0]['Srv']
-    if ($srv -match '(?i)site4now|SQL1002') {
-        throw "Refusing production cloud host reported by @@SERVERNAME ($srv)."
+    if ($srv -match '(?i)SQL1002|sql8020|sql8010') {
+        throw "Refusing host reported by @@SERVERNAME ($srv). Test Cloud restore stays on sql8006."
+    }
+    if ($srv -match '(?i)site4now' -and $srv -notmatch '(?i)sql8006') {
+        throw "Refusing site4now host reported by @@SERVERNAME ($srv). Test Cloud is sql8006 only."
     }
 
     $exists = Invoke-Sb2Table -Connection $conn -Sql ("SELECT DB_ID(N'" + $Database.Replace("'", "''") + "') AS Id;")
@@ -128,8 +129,8 @@ SELECT DB_NAME() AS DbName,
 "@
     $restoredDb = [string]$smoke.Rows[0]['DbName']
     $restoredSrv = [string]$smoke.Rows[0]['Srv']
-    if ($restoredDb -match '^(?i)SB1$' -or $restoredSrv -match '(?i)site4now|SQL1002') {
-        throw 'Restore landed on SB1 or the production cloud host.'
+    if ($restoredDb -notmatch '^(?i)db_abe8c0_sb2$' -or $restoredSrv -match '(?i)SQL1002|sql8020|sql8010') {
+        throw "Restore landed on $restoredDb / $restoredSrv. Expected db_abe8c0_sb2 on sql8006."
     }
     if ($smoke.Rows[0]['SyncConfigId'] -is [DBNull]) {
         throw 'Smoke failed: dbo.SyncConfig is missing after restore.'

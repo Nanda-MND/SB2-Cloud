@@ -13,13 +13,13 @@
 [CmdletBinding()]
 param(
     [string]$ErpFolder = 'D:\Dev\SB2-Cloud\',
-    [string]$LocalServer = 'YOUR_DEV_PC\INSTANCE',
+    [string]$LocalServer = 'local\SB2',
     [string]$LocalDatabase = 'SB2',
     [string]$LocalUser = 'sa',
     [string]$LocalPassword = $env:SB2_DEV_LOCAL_SQL_PASSWORD,
-    [string]$CloudServer = 'YOUR_TEST_CLOUD_HOST',
-    [string]$CloudDatabase = 'YOUR_TEST_CLOUD_DB',
-    [string]$CloudUser = 'YOUR_TEST_CLOUD_USER',
+    [string]$CloudServer = 'sql8006.site4now.net',
+    [string]$CloudDatabase = 'db_abe8c0_sb2',
+    [string]$CloudUser = 'db_abe8c0_sb2_admin',
     [string]$CloudPassword = $env:SB2_TEST_CLOUD_SQL_PASSWORD,
     [string]$ServiceName = 'SB2.SyncAgent.Dev',
     [switch]$InstallService,
@@ -47,9 +47,8 @@ Assert-Sb2ResolvedEndpoint -Server $LocalServer -Database $LocalDatabase -User $
 Assert-Sb2ResolvedEndpoint -Server $CloudServer -Database $CloudDatabase -User $CloudUser
 Assert-Sb2NotDevLocalServer -Server $CloudServer -Database $CloudDatabase -DevLocalServer $LocalServer -DevLocalDatabase $LocalDatabase
 
-if ([string]::IsNullOrWhiteSpace($LocalPassword) -or [string]::IsNullOrWhiteSpace($CloudPassword)) {
-    throw 'Dev Local and Test Cloud passwords are required. Do not commit them.'
-}
+Assert-Sb2RealPassword -Password $LocalPassword
+Assert-Sb2RealPassword -Password $CloudPassword
 
 $localConn = New-Sb2SqlConnectionString -Server $LocalServer -Database $LocalDatabase -User $LocalUser -Password $LocalPassword
 $cloudConn = New-Sb2SqlConnectionString -Server $CloudServer -Database $CloudDatabase -User $CloudUser -Password $CloudPassword

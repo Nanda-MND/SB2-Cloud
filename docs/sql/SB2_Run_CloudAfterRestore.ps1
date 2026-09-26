@@ -10,11 +10,11 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$Server,
-    [Parameter(Mandatory = $true)][string]$Database,
-    [Parameter(Mandatory = $true)][string]$User,
+    [string]$Server = 'sql8006.site4now.net',
+    [string]$Database = 'db_abe8c0_sb2',
+    [string]$User = 'db_abe8c0_sb2_admin',
     [string]$Password = $env:SB2_TEST_CLOUD_SQL_PASSWORD,
-    [string]$DevLocalServer = '',
+    [string]$DevLocalServer = 'local\SB2',
     [string]$DevLocalDatabase = 'SB2',
     [switch]$EnableTxnC2L
 )
@@ -27,9 +27,7 @@ $ErrorActionPreference = 'Stop'
 Assert-Sb2DevTestTarget -Server $Server -Database $Database -User $User -Role TestCloud
 Assert-Sb2ResolvedEndpoint -Server $Server -Database $Database -User $User
 Assert-Sb2NotDevLocalServer -Server $Server -Database $Database -DevLocalServer $DevLocalServer -DevLocalDatabase $DevLocalDatabase
-if ([string]::IsNullOrWhiteSpace($Password)) {
-    throw 'Test Cloud password is required via -Password or SB2_TEST_CLOUD_SQL_PASSWORD. Do not commit it.'
-}
+Assert-Sb2RealPassword -Password $Password
 
 $scripts = @(
     'SB2_Assert_NotSB1OrProd.sql',

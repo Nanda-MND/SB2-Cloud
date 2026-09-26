@@ -8,11 +8,11 @@
 
   Example (Dev PC):
     powershell -File docs\sql\SB2_Run_LocalBootstrap.ps1 `
-      -Server 'YOUR_DEV_PC\INSTANCE' -Database SB2 -User sa
+      -Server 'local\SB2' -Database SB2 -User sa
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$Server,
+    [string]$Server = 'local\SB2',
     [string]$Database = 'SB2',
     [string]$User = 'sa',
     [string]$Password = $env:SB2_DEV_LOCAL_SQL_PASSWORD
@@ -25,9 +25,7 @@ $ErrorActionPreference = 'Stop'
 
 Assert-Sb2DevTestTarget -Server $Server -Database $Database -User $User -Role Local
 Assert-Sb2ResolvedEndpoint -Server $Server -Database $Database -User $User
-if ([string]::IsNullOrWhiteSpace($Password)) {
-    throw 'Dev Local password is required via -Password or SB2_DEV_LOCAL_SQL_PASSWORD. Do not commit it.'
-}
+Assert-Sb2RealPassword -Password $Password
 
 $required = @(
     'SB2_Assert_NotSB1OrProd.sql',

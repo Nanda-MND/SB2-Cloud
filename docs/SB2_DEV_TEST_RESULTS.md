@@ -9,7 +9,7 @@ Live/Client cutover was not started.
 
 | # | Test | Expect | Result | Notes |
 |---|------|--------|--------|-------|
-| 1 | Environment | Only Dev Local + Test Cloud used | BLOCKED | Connection file has DEV/TEST placeholders only. No SQL host was contacted, so this row was not executed. Runners refuse SB1 and `SQL1002.site4now.net`. |
+| 1 | Environment | Only Dev Local + Test Cloud used | BLOCKED | Test targets are now `local\SB2` / `SB2` and `sql8006.site4now.net` / `db_abe8c0_sb2`. This environment did not connect. SQL1002 and `db_abbe78_warehouse` stay refused. |
 | 2 | Repo | Work done in `SB2-Cloud`, not live SB | PASS | Changes are only in Nanda-MND/SB2-Cloud. SB and SB2 repos were not modified. |
 | 3 | Local bootstrap | DataSync + Detail/Head packs + UserRights Local OK | BLOCKED | `SB2_Run_LocalBootstrap.ps1` is in the repo. Dev SQL `YOUR_DEV_PC\INSTANCE` / `SB2` is not reachable from this environment. |
 | 4 | Cloud restore | Dev `.bak` restored to Test Cloud | BLOCKED | `SB2_Run_Backup.ps1` and `SB2_Run_TestCloudRestore.ps1` are in the repo. No backup was taken and Test Cloud was not contacted. |

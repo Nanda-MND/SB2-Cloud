@@ -1,9 +1,14 @@
 # Shared Dev/Test guards for SB2-Cloud runners.
 # Dot-source this file. It does not connect to SQL.
 
-$script:Sb2ForbiddenServerPattern = '(?i)(sql1002\.site4now\.net|site4now\.net|sql1002)'
-$script:Sb2ForbiddenDatabases = @('SB1', 'SB', 'db_abbe78_warehouse')
-$script:Sb2ForbiddenUsers = @('db_abbe78_warehouse_admin')
+$script:Sb2ProductionServerPattern = '(?i)(sql1002|sql8020|sql8010)'
+$script:Sb2TestCloudServerPattern = '(?i)^sql8006(\.site4now\.net)?$'
+$script:Sb2TestCloudDatabase = 'db_abe8c0_sb2'
+$script:Sb2TestCloudUser = 'db_abe8c0_sb2_admin'
+$script:Sb2LocalServer = 'local\SB2'
+$script:Sb2LocalDatabase = 'SB2'
+$script:Sb2ForbiddenDatabases = @('SB1', 'SB', 'db_abbe78_warehouse', 'db_abe8c0_erp', 'db_abe8c0_luckyone')
+$script:Sb2ForbiddenUsers = @('db_abbe78_warehouse_admin', 'db_abe8c0_erp_admin', 'db_abe8c0_luckyone_admin')
 $script:Sb2DevServiceName = 'SB2.SyncAgent.Dev'
 $script:Sb2DevErpFolder = 'D:\Dev\SB2-Cloud\'
 
@@ -39,8 +44,8 @@ function Assert-Sb2DevTestTarget {
     Assert-Sb2ServerToken -Server $Server
     Assert-Sb2SqlIdentifier -Name $Database -Label 'Database'
 
-    if ($Server -match $script:Sb2ForbiddenServerPattern) {
-        throw "Refusing production cloud host '$Server'. This phase allows Dev Local and Test Cloud only."
+    if ($Server -match $script:Sb2ProductionServerPattern) {
+        throw "Refusing host '$Server'. This test run uses local\SB2 and sql8006.site4now.net / db_abe8c0_sb2 only."
     }
 
     foreach ($forbidden in $script:Sb2ForbiddenDatabases) {
@@ -66,8 +71,23 @@ function Assert-Sb2DevTestTarget {
     }
 
     if ($Role -eq 'Local') {
-        if ($Database -match '(?i)warehouse' -or $Database -match '(?i)abbe') {
-            throw "Refusing to run Dev Local scripts on a cloud/warehouse database '$Database'."
+        if ($Server -match '(?i)site4now|sql8006') {
+            throw "Refusing to run Dev Local scripts on Test Cloud host '$Server'."
+        }
+        if ($Database -match '(?i)^db_abe8c0_' -or $Database -match '(?i)warehouse' -or $Database -match '(?i)abbe') {
+            throw "Refusing to run Dev Local scripts on cloud database '$Database'."
+        }
+    }
+
+    if ($Role -eq 'TestCloud') {
+        if ($Server -notmatch $script:Sb2TestCloudServerPattern) {
+            throw "Test Cloud server must be sql8006.site4now.net. Refusing '$Server'."
+        }
+        if (-not [string]::Equals($Database, $script:Sb2TestCloudDatabase, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Test Cloud database must be db_abe8c0_sb2. Refusing '$Database'."
+        }
+        if (-not [string]::IsNullOrWhiteSpace($User) -and -not [string]::Equals($User, $script:Sb2TestCloudUser, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Test Cloud login must be db_abe8c0_sb2_admin. Refusing '$User'."
         }
     }
 }
@@ -116,8 +136,22 @@ function Assert-Sb2ConnectionText {
     if ($catalogSb1 -or $catalogSb -or $databaseSb1) {
         throw 'Refusing SB1 or live SB catalog in a connection string.'
     }
-    if ($ConnectionText -match '(?i)site4now|sql1002|db_abbe78') {
-        throw 'Refusing production cloud host or catalog in a connection string.'
+    if ($ConnectionText -match '(?i)sql1002|sql8020|sql8010|db_abbe78|db_abe8c0_erp|db_abe8c0_luckyone') {
+        throw 'Refusing production cloud or another account database in a connection string.'
+    }
+    if ($ConnectionText -match '(?i)site4now') {
+        $testServer = [regex]::IsMatch($ConnectionText, 'sql8006\.site4now\.net', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        $testCatalog = [regex]::IsMatch($ConnectionText, 'Initial\s+Catalog\s*=\s*db_abe8c0_sb2\b', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        if (-not ($testServer -and $testCatalog)) {
+            throw 'site4now is allowed only for Test Cloud sql8006.site4now.net / db_abe8c0_sb2.'
+        }
+    }
+}
+
+function Assert-Sb2RealPassword {
+    param([string]$Password)
+    if ([string]::IsNullOrWhiteSpace($Password) -or $Password -match '(?i)^(YOUR_DB_PASSWORD|\*\*\*|PLACEHOLDER)$') {
+        throw 'Password is still a placeholder. Set SB2_DEV_LOCAL_SQL_PASSWORD or SB2_TEST_CLOUD_SQL_PASSWORD at runtime. Do not commit it.'
     }
 }
 

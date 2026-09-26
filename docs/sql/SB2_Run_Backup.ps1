@@ -6,7 +6,7 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$Server,
+    [string]$Server = 'local\SB2',
     [string]$Database = 'SB2',
     [string]$User = 'sa',
     [string]$Password = $env:SB2_DEV_LOCAL_SQL_PASSWORD,
@@ -20,9 +20,7 @@ $ErrorActionPreference = 'Stop'
 
 Assert-Sb2DevTestTarget -Server $Server -Database $Database -User $User -Role Local
 Assert-Sb2ResolvedEndpoint -Server $Server -Database $Database -User $User
-if ([string]::IsNullOrWhiteSpace($Password)) {
-    throw 'Dev Local password is required via -Password or SB2_DEV_LOCAL_SQL_PASSWORD. Do not commit it.'
-}
+Assert-Sb2RealPassword -Password $Password
 if ($BackupPath -match '(?i)site4now|abbe78|\\SB1\\') {
     throw 'Refusing a backup path that looks like SB1 or production cloud storage.'
 }
@@ -48,8 +46,8 @@ try {
     $probeTable = New-Object System.Data.DataTable
     [void]$adapter.Fill($probeTable)
     $srv = [string]$probeTable.Rows[0]['Srv']
-    if ($srv -match '(?i)site4now|SQL1002') {
-        throw "Refusing production cloud host reported by @@SERVERNAME ($srv)."
+    if ($srv -match '(?i)SQL1002|sql8006|sql8020|sql8010|site4now') {
+        throw "Refusing to back up from a cloud host reported by @@SERVERNAME ($srv). Backup runs on local\SB2."
     }
     if ($probeTable.Rows[0]['Id'] -is [DBNull]) {
         throw "Database $Database was not found on $Server."

@@ -18,12 +18,13 @@ Filled from `docs/config/SB2_CONNECTIONS.md`. Passwords are not in git.
 | Key | Value |
 |-----|-------|
 | Environment | `DEV_TEST` |
-| Dev Local | `YOUR_DEV_PC\INSTANCE` / database `SB2` / user `sa` |
-| Test Cloud | `YOUR_TEST_CLOUD_HOST` / `YOUR_TEST_CLOUD_DB` / `YOUR_TEST_CLOUD_USER` |
+| Dev Local | `local\SB2` / database `SB2` / user `sa` |
+| Test Cloud | `sql8006.site4now.net` / `db_abe8c0_sb2` / `db_abe8c0_sb2_admin` |
 | ERP / test folder | `D:\Dev\SB2-Cloud\` |
 | Windows service | `SB2.SyncAgent.Dev` |
 | RC4 EncryptKey | `27042005` |
-| Refused | SB1, `SQL1002.site4now.net`, `db_abbe78_warehouse`, client folder `D:\MinnNandar\Software` |
+| Refused | SB1, `SQL1002.site4now.net`, `db_abbe78_warehouse`, `db_abe8c0_erp`, `db_abe8c0_luckyone`, client folder `D:\MinnNandar\Software` |
+| Live later | Change this table when the live connection is approved. Do not point this test run at live. |
 
 Runners:
 
