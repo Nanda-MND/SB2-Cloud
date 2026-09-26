@@ -8,11 +8,11 @@
 
   Example (Dev PC):
     powershell -File docs\sql\SB2_Run_LocalBootstrap.ps1 `
-      -Server 'local\SB2' -Database SB2 -User sa
+      -Server localhost -Database SB2 -User sa
 #>
 [CmdletBinding()]
 param(
-    [string]$Server = 'local\SB2',
+    [string]$Server = 'localhost',
     [string]$Database = 'SB2',
     [string]$User = 'sa',
     [string]$Password = $env:SB2_DEV_LOCAL_SQL_PASSWORD

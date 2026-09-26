@@ -5,7 +5,8 @@ namespace SB.SyncAgent
 {
     /// <summary>
     /// Dev/Test lock for this test run.
-    /// Allows local\SB2 and sql8006.site4now.net / db_abe8c0_sb2.
+    /// Allows localhost (or . / 127.0.0.1 / (local) / local\SB2) database SB2,
+    /// and sql8006.site4now.net or tcp:sql8006.site4now.net,1433 / db_abe8c0_sb2.
     /// Refuses SB1, SQL1002, and the other account databases.
     /// </summary>
     internal static class DevTestGuard

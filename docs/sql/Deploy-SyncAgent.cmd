@@ -4,7 +4,7 @@ REM Live/client SyncAgent install is out of scope until a separate cutover is ap
 echo.
 echo Refusing live/client SyncAgent install.
 echo This phase allows Dev PC only:
-echo   ERP folder   D:\Dev\SB2-Cloud\
+echo   ERP folder   D:\Dev\SB2-Cloud-Runtime\ (no .git)
 echo   Service name SB2.SyncAgent.Dev
 echo   Script       SB.SyncAgent\SB2_Dev_EncryptAndOnce.ps1
 echo.

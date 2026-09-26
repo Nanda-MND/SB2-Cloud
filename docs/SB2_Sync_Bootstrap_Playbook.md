@@ -18,9 +18,10 @@ Filled from `docs/config/SB2_CONNECTIONS.md`. Passwords are not in git.
 | Key | Value |
 |-----|-------|
 | Environment | `DEV_TEST` |
-| Dev Local | `local\SB2` / database `SB2` / user `sa` |
-| Test Cloud | `sql8006.site4now.net` / `db_abe8c0_sb2` / `db_abe8c0_sb2_admin` |
-| ERP / test folder | `D:\Dev\SB2-Cloud\` |
+| Dev Local | `localhost` / database `SB2` / user `sa` (default instance). `.`, `(local)`, and `127.0.0.1` are the same instance. `local\SB2` is not installed. |
+| Test Cloud | `sql8006.site4now.net` (runners connect as `tcp:sql8006.site4now.net,1433`) / `db_abe8c0_sb2` / `db_abe8c0_sb2_admin` |
+| ERP runtime folder | `D:\Dev\SB2-Cloud-Runtime\` (no `.git`) |
+| Git checkout | `D:\Dev\SB2-Cloud\` — scripts and source only. Do not write `DBConnection.ini` here. |
 | Windows service | `SB2.SyncAgent.Dev` |
 | RC4 EncryptKey | `27042005` |
 | Refused | SB1, `SQL1002.site4now.net`, `db_abbe78_warehouse`, `db_abe8c0_erp`, `db_abe8c0_luckyone`, client folder `D:\MinnNandar\Software` |

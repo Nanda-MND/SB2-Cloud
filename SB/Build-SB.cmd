@@ -18,6 +18,6 @@ if errorlevel 1 (
 
 echo Built: %~dp0bin\Release\SB.exe
 echo ObjectListView hint path: lib\ObjectListView.dll
-echo Dev ERP folder, if you copy it: D:\Dev\SB2-Cloud\
+echo Dev ERP runtime folder, if you copy it: D:\Dev\SB2-Cloud-Runtime\ (no .git)
 echo Do not copy this build to a client PC.
 exit /b 0

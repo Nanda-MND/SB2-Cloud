@@ -1,20 +1,20 @@
 # SB2-Cloud Dev / Test acceptance results
 
-Date: 2026-09-25  
-Environment: this cloud agent workspace (Linux). It cannot open Dev PC SQL Server, Test Cloud SQL, or the WinForms history UI.
+Date: 2026-09-26  
+Environment: Dev PC retest of `cursor/sb2-dev-test-bootstrap-9fc4`, plus this repo update. This Linux workspace still cannot open Dev SQL or the WinForms UI.
 
-Rule used: rows that need Dev SQL, Test Cloud, or the Dev PC app are **BLOCKED**. They are not marked PASS.
+Dev PC already passed: Local bootstrap on database `SB2`, hosting-panel restore of that backup onto `db_abe8c0_sb2`, cloud scripts with a manual UserRights trigger drop, and EncryptAndOnce `/once` into a folder that is not a git checkout.
 
-Live/Client cutover was not started.
+Live/Client cutover was not started. H1–H8 were not run.
 
 | # | Test | Expect | Result | Notes |
 |---|------|--------|--------|-------|
-| 1 | Environment | Only Dev Local + Test Cloud used | BLOCKED | Test targets are now `local\SB2` / `SB2` and `sql8006.site4now.net` / `db_abe8c0_sb2`. This environment did not connect. SQL1002 and `db_abbe78_warehouse` stay refused. |
+| 1 | Environment | Only Dev Local + Test Cloud used | PASS | Dev PC database `SB2` is on the default instance (`localhost`), not a named instance `SB2`. Test Cloud is `sql8006.site4now.net` / `db_abe8c0_sb2`. SQL1002 and `db_abbe78_warehouse` were not used. |
 | 2 | Repo | Work done in `SB2-Cloud`, not live SB | PASS | Changes are only in Nanda-MND/SB2-Cloud. SB and SB2 repos were not modified. |
-| 3 | Local bootstrap | DataSync + Detail/Head packs + UserRights Local OK | BLOCKED | `SB2_Run_LocalBootstrap.ps1` is in the repo. Dev SQL `YOUR_DEV_PC\INSTANCE` / `SB2` is not reachable from this environment. |
-| 4 | Cloud restore | Dev `.bak` restored to Test Cloud | BLOCKED | `SB2_Run_Backup.ps1` and `SB2_Run_TestCloudRestore.ps1` are in the repo. No backup was taken and Test Cloud was not contacted. |
-| 5 | Cloud scripts | C2L + Detail/Head CLOUD + UserRights L2C-only | BLOCKED | `SB2_Run_CloudAfterRestore.ps1` is in the repo. It was not executed. |
-| 6 | Agent `/once` | Dev↔Test Cloud cycle OK | BLOCKED | `SB2_Dev_EncryptAndOnce.ps1` encrypts Dev/Test ini and runs `/once` on the Dev PC. This environment cannot build the .NET Framework agent or open either SQL host. Ini files were not written and were not committed. |
+| 3 | Local bootstrap | DataSync + Detail/Head packs + UserRights Local OK | PASS | Dev PC bootstrap on database `SB2` succeeded. `local\SB2` does not resolve (no named instance). Runners now default to `localhost`. Re-run the script with that default when convenient. |
+| 4 | Cloud restore | Dev `.bak` restored to Test Cloud | PASS | Hosting panel restored the post-bootstrap `.bak` onto `db_abe8c0_sb2`. `SB2_Run_Backup.ps1` crashed (`InitialCatalog`); that builder path is removed. Re-run the backup script so it writes a `.bak` itself. |
+| 5 | Cloud scripts | C2L + Detail/Head CLOUD + UserRights L2C-only | PASS | Cloud scripts ran. UserRights TestCloud assert failed until a manual trigger drop and `CaptureLocal=0`. `DataSync_UserRights_L2C_Only.sql` now drops every UserRights `%Sync%` trigger and sets `CaptureLocal=0`, `CaptureCloud=0`, `IsEnabled=1`. sqlcmd now uses `tcp:sql8006.site4now.net,1433`. Re-run `SB2_Run_CloudAfterRestore.ps1` with no manual TCP prefix and no manual DROP. |
+| 6 | Agent `/once` | Dev↔Test Cloud cycle OK | FAIL | EncryptAndOnce `/once` ran in `D:\Dev\SB2-Cloud-Runtime\` (the git checkout `D:\Dev\SB2-Cloud\` is refused). Two runs: Synced 139, Pending 55. Log: PurchaseHead `ExecuteScalar` on a closed connection. Push/pull now re-opens a closed connection and retries that row once. Re-run `/once` and confirm Pending is near 0 with no connection-closed errors. |
 | 7 | Master L2C | Dev edit → Test Cloud | BLOCKED | Needs a running Dev↔Test sync cycle. |
 | 8 | C2L (if enabled) | Test Cloud edit → Dev | BLOCKED | Needs Test Cloud. |
 | 9 | Detail delete | Dev delete line → Test Cloud line gone | BLOCKED | Detail Op=D hard-delete marker is in `DataSync_10_SyncApply_Generic.sql` (`hardDeleteDetail`). Runtime delete was not executed. |
@@ -48,8 +48,8 @@ SyncAgent and SyncStatus stay on the existing .NET Framework projects. The Dev s
 
 ## Sign-off
 
-Dev/Test runtime sign-off is not granted. BLOCKED rows must be run on the Dev PC against Dev Local and Test Cloud before any Live/Client cutover plan.
+Dev/Test runtime sign-off is not granted. Rows 4, 5, and 6 still need a clean Dev PC re-run of the fixed backup script, `SB2_Run_CloudAfterRestore.ps1` (TCP, no manual UserRights DROP), and `/once` until Pending is near 0. H1–H8 stay BLOCKED until the Tester runs them.
 
-Follow-up after Dev PC build `d90aa3e`: `Install-SyncStatus.cmd` no longer uses `set /p` inside parentheses, so cmd.exe does not stop with `: was unexpected at this time.` Assert scripts now say to run `SB2_Run_LocalBootstrap.ps1` first when `SyncConfig` is missing. Runners still pass `sqlcmd -v Role=Local` and `Role=TestCloud`. Connection placeholders, encrypted ini, bootstrap, Test Cloud, and H1-H8 stay BLOCKED until the Dev PC supplies runtime passwords outside git.
+`Install-SyncStatus.cmd` no longer uses `set /p` inside parentheses. Assert scripts still require bootstrap first, and the runners still pass `sqlcmd -v Role=Local` and `Role=TestCloud`. Passwords and `*.ini` stay out of git.
 
-**Next:** ask before any Live DB or Client PC cutover document or deploy.
+**Next:** Tester re-check, then H1–H8. Ask before any Live DB or Client PC cutover.

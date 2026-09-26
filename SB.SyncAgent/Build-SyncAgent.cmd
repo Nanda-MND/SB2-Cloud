@@ -16,7 +16,7 @@ echo.
 echo Built: %~dp0bin\Release\SB.SyncAgent.exe
 dir "%~dp0bin\Release\SB.SyncAgent.exe"
 echo.
-echo Dev PC only. ERP folder: D:\Dev\SB2-Cloud\
+echo Dev PC only. ERP runtime folder: D:\Dev\SB2-Cloud-Runtime\ (no .git)
 echo Service name: SB2.SyncAgent.Dev
 echo Do not copy to a client PC or start SB.SyncAgent.
 echo Next: powershell -File SB2_Dev_EncryptAndOnce.ps1

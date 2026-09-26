@@ -1,7 +1,7 @@
 /*
   UserRights stays L2C-only.
   Local:  CaptureLocal=1, CaptureCloud=0
-  Cloud:  CaptureCloud=0 and no UserRights sync trigger
+  Cloud:  IsEnabled=1, CaptureLocal=0, CaptureCloud=0, and no UserRights %Sync% trigger
 
   Do not run this file by itself on an empty Dev database.
   Order:
@@ -36,14 +36,16 @@ BEGIN
 END
 ELSE IF @role = N'TestCloud'
 BEGIN
-    IF EXISTS (
+    IF NOT EXISTS (
         SELECT 1
         FROM dbo.SyncConfig
         WHERE TableName = N'UserRights'
-          AND ISNULL(CaptureCloud, 0) = 1
+          AND IsEnabled = 1
+          AND ISNULL(CaptureLocal, 0) = 0
+          AND ISNULL(CaptureCloud, 0) = 0
     )
     BEGIN
-        RAISERROR(N'UserRights C2L must stay off on Test Cloud (CaptureCloud=0). Run SB2_Run_CloudAfterRestore.ps1.', 16, 1);
+        RAISERROR(N'UserRights on Test Cloud must be IsEnabled=1, CaptureLocal=0, CaptureCloud=0. Run SB2_Run_CloudAfterRestore.ps1.', 16, 1);
         RETURN;
     END
 

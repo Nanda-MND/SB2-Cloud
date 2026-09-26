@@ -16,7 +16,7 @@ param(
     [Parameter(Mandatory = $true)][string]$BackupPath,
     [Parameter(Mandatory = $true)][string]$DataFolder,
     [Parameter(Mandatory = $true)][string]$LogFolder,
-    [string]$DevLocalServer = 'local\SB2',
+    [string]$DevLocalServer = 'localhost',
     [string]$DevLocalDatabase = 'SB2',
     [switch]$AllowReplace
 )
@@ -38,9 +38,8 @@ if ($BackupPath -match '(?i)site4now|abbe78') {
 }
 
 Add-Type -AssemblyName System.Data
-$cs = New-Sb2SqlConnectionString -Server $Server -Database 'master' -User $User -Password $Password
-$builder = New-Object System.Data.SqlClient.SqlConnectionStringBuilder $cs
-$builder.InitialCatalog = 'master'
+# Connect to master with a freshly built string. Do not assign SqlConnectionStringBuilder.InitialCatalog.
+$masterCs = New-Sb2SqlConnectionString -Server $Server -Database 'master' -User $User -Password $Password
 
 function Invoke-Sb2NonQuery {
     param($Connection, [string]$Sql, [int]$Timeout = 0)
@@ -64,7 +63,7 @@ function Invoke-Sb2Table {
 $escapedBak = $BackupPath.Replace("'", "''")
 Write-Host "Test Cloud restore onto $Server / $Database"
 
-$conn = New-Object System.Data.SqlClient.SqlConnection $builder.ConnectionString
+$conn = New-Object System.Data.SqlClient.SqlConnection $masterCs
 try {
     $conn.Open()
     $srv = [string](Invoke-Sb2Table -Connection $conn -Sql 'SELECT CONVERT(nvarchar(256), @@SERVERNAME) AS Srv;').Rows[0]['Srv']

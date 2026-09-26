@@ -2,15 +2,18 @@
 # Dot-source this file. It does not connect to SQL.
 
 $script:Sb2ProductionServerPattern = '(?i)(sql1002|sql8020|sql8010)'
-$script:Sb2TestCloudServerPattern = '(?i)^sql8006(\.site4now\.net)?$'
+# Logical name sql8006 / sql8006.site4now.net, plus the TCP form that avoids Named Pipes.
+$script:Sb2TestCloudServerPattern = '(?i)^(tcp:)?sql8006(\.site4now\.net)?(,1433)?$'
 $script:Sb2TestCloudDatabase = 'db_abe8c0_sb2'
 $script:Sb2TestCloudUser = 'db_abe8c0_sb2_admin'
-$script:Sb2LocalServer = 'local\SB2'
+# Dev PC hosts database SB2 on the default instance (localhost). local\SB2 is not installed.
+$script:Sb2LocalServer = 'localhost'
 $script:Sb2LocalDatabase = 'SB2'
 $script:Sb2ForbiddenDatabases = @('SB1', 'SB', 'db_abbe78_warehouse', 'db_abe8c0_erp', 'db_abe8c0_luckyone')
 $script:Sb2ForbiddenUsers = @('db_abbe78_warehouse_admin', 'db_abe8c0_erp_admin', 'db_abe8c0_luckyone_admin')
 $script:Sb2DevServiceName = 'SB2.SyncAgent.Dev'
-$script:Sb2DevErpFolder = 'D:\Dev\SB2-Cloud\'
+# Runtime folder only. The git checkout D:\Dev\SB2-Cloud\ must not receive ini files.
+$script:Sb2DevErpFolder = 'D:\Dev\SB2-Cloud-Runtime\'
 
 function Assert-Sb2SqlIdentifier {
     param(
@@ -45,7 +48,7 @@ function Assert-Sb2DevTestTarget {
     Assert-Sb2SqlIdentifier -Name $Database -Label 'Database'
 
     if ($Server -match $script:Sb2ProductionServerPattern) {
-        throw "Refusing host '$Server'. This test run uses local\SB2 and sql8006.site4now.net / db_abe8c0_sb2 only."
+        throw "Refusing host '$Server'. This test run uses localhost / SB2 and sql8006.site4now.net / db_abe8c0_sb2 only."
     }
 
     foreach ($forbidden in $script:Sb2ForbiddenDatabases) {
@@ -194,6 +197,16 @@ function Get-Sb2RepoRoot {
     throw 'Could not locate the SB2-Cloud repo root.'
 }
 
+function Convert-Sb2SqlServer {
+    param([Parameter(Mandatory = $true)][string]$Server)
+
+    # Test Cloud shared hosting answers on TCP 1433. A bare host name makes sqlcmd try Named Pipes and time out.
+    if ($Server -match '(?i)^(tcp:)?sql8006(\.site4now\.net)?(,1433)?$') {
+        return 'tcp:sql8006.site4now.net,1433'
+    }
+    return $Server
+}
+
 function New-Sb2SqlConnectionString {
     param(
         [Parameter(Mandatory = $true)][string]$Server,
@@ -202,8 +215,12 @@ function New-Sb2SqlConnectionString {
         [Parameter(Mandatory = $true)][string]$Password
     )
 
-    Assert-Sb2ConnectionText -ConnectionText ("Data Source=" + $Server + ";Initial Catalog=" + $Database + ";User Id=" + $User + ";")
-    return "Data Source=$Server;Initial Catalog=$Database;User Id=$User;Password=$Password;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;"
+    $endpoint = Convert-Sb2SqlServer -Server $Server
+    # Keep the catalog keyword as "Initial Catalog" (with a space). Do not round-trip this
+    # string through SqlConnectionStringBuilder.InitialCatalog — that property name is not a
+    # connection-string keyword and throws "Keyword not supported: 'InitialCatalog'".
+    Assert-Sb2ConnectionText -ConnectionText ("Data Source=" + $endpoint + ";Initial Catalog=" + $Database + ";User Id=" + $User + ";")
+    return "Data Source=$endpoint;Initial Catalog=$Database;User Id=$User;Password=$Password;Encrypt=True;TrustServerCertificate=True;Connection Timeout=60;"
 }
 
 function Invoke-Sb2SqlFile {
@@ -221,7 +238,9 @@ function Invoke-Sb2SqlFile {
     }
 
     $sqlcmd = Get-Sb2SqlCmd
-    $argList = @('-S', $Server, '-d', $Database, '-U', $User, '-P', $Password, '-C', '-I', '-b', '-i', $File)
+    $endpoint = Convert-Sb2SqlServer -Server $Server
+    # -l login timeout seconds. -t 0 means no query timeout (bootstrap scripts can run for minutes).
+    $argList = @('-S', $endpoint, '-d', $Database, '-U', $User, '-P', $Password, '-C', '-I', '-b', '-l', '60', '-t', '0', '-i', $File)
     if ($Variables) {
         foreach ($key in @($Variables.Keys)) {
             $argList += @('-v', ($key + '=' + $Variables[$key]))

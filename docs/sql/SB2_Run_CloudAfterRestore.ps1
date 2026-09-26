@@ -14,7 +14,7 @@ param(
     [string]$Database = 'db_abe8c0_sb2',
     [string]$User = 'db_abe8c0_sb2_admin',
     [string]$Password = $env:SB2_TEST_CLOUD_SQL_PASSWORD,
-    [string]$DevLocalServer = 'local\SB2',
+    [string]$DevLocalServer = 'localhost',
     [string]$DevLocalDatabase = 'SB2',
     [switch]$EnableTxnC2L
 )

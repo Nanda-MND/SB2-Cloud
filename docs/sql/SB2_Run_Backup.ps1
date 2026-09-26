@@ -6,7 +6,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Server = 'local\SB2',
+    [string]$Server = 'localhost',
     [string]$Database = 'SB2',
     [string]$User = 'sa',
     [string]$Password = $env:SB2_DEV_LOCAL_SQL_PASSWORD,
@@ -26,9 +26,8 @@ if ($BackupPath -match '(?i)site4now|abbe78|\\SB1\\') {
 }
 
 Add-Type -AssemblyName System.Data
-$cs = New-Sb2SqlConnectionString -Server $Server -Database $Database -User $User -Password $Password
-$builder = New-Object System.Data.SqlClient.SqlConnectionStringBuilder $cs
-$builder.InitialCatalog = 'master'
+# Connect to master with a freshly built string. Do not assign SqlConnectionStringBuilder.InitialCatalog.
+$masterCs = New-Sb2SqlConnectionString -Server $Server -Database 'master' -User $User -Password $Password
 
 $escapedPath = $BackupPath.Replace("'", "''")
 $sql = @"
@@ -36,7 +35,7 @@ BACKUP DATABASE [$Database] TO DISK = N'$escapedPath' WITH COPY_ONLY, INIT, CHEC
 "@
 
 Write-Host "Dev Local backup $Server / $Database"
-$conn = New-Object System.Data.SqlClient.SqlConnection $builder.ConnectionString
+$conn = New-Object System.Data.SqlClient.SqlConnection $masterCs
 try {
     $conn.Open()
     $probe = $conn.CreateCommand()
@@ -47,7 +46,7 @@ try {
     [void]$adapter.Fill($probeTable)
     $srv = [string]$probeTable.Rows[0]['Srv']
     if ($srv -match '(?i)SQL1002|sql8006|sql8020|sql8010|site4now') {
-        throw "Refusing to back up from a cloud host reported by @@SERVERNAME ($srv). Backup runs on local\SB2."
+        throw "Refusing to back up from a cloud host reported by @@SERVERNAME ($srv). Backup runs on the Dev PC default instance (localhost), database SB2."
     }
     if ($probeTable.Rows[0]['Id'] -is [DBNull]) {
         throw "Database $Database was not found on $Server."

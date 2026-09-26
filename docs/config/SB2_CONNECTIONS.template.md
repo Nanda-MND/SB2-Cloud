@@ -41,7 +41,7 @@ Encrypt as: `CloudConnection.ini`
 
 | Field | Value |
 |-------|-------|
-| ERP / test folder | `D:\Dev\SB2-Cloud\` (not Client PC path) |
+| ERP / runtime folder | `D:\Dev\SB2-Cloud-Runtime\` (no `.git`; not the repo checkout, not a Client PC path) |
 | SyncAgent exe | `SB.SyncAgent.exe` |
 | Tray exe | `SB.SyncStatus.exe` |
 | RC4 EncryptKey | confirm vs WinForms (`27042005` in SB) |

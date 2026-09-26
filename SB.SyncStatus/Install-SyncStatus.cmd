@@ -5,7 +5,7 @@ REM set /p must stay outside parentheses. A prompt that contains () breaks cmd.e
 
 setlocal
 set SRC=%~dp0bin\Release\SB.SyncStatus.exe
-set ERP=D:\Dev\SB2-Cloud
+set ERP=D:\Dev\SB2-Cloud-Runtime
 
 if not exist "%SRC%" goto NeedBuild
 
@@ -26,7 +26,7 @@ echo %ERP% | findstr /I "MinnNandar site4now" >nul
 if errorlevel 1 goto CheckIni
 echo Refusing live/client ERP folder:
 echo   %ERP%
-echo Use D:\Dev\SB2-Cloud\
+echo Use D:\Dev\SB2-Cloud-Runtime\ (no .git). Do not use the git checkout D:\Dev\SB2-Cloud\
 pause
 exit /b 1
 

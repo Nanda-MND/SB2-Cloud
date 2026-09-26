@@ -12,8 +12,8 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$ErpFolder = 'D:\Dev\SB2-Cloud\',
-    [string]$LocalServer = 'local\SB2',
+    [string]$ErpFolder = 'D:\Dev\SB2-Cloud-Runtime\',
+    [string]$LocalServer = 'localhost',
     [string]$LocalDatabase = 'SB2',
     [string]$LocalUser = 'sa',
     [string]$LocalPassword = $env:SB2_DEV_LOCAL_SQL_PASSWORD,
