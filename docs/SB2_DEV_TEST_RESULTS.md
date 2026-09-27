@@ -265,3 +265,66 @@ Code on `cursor/sb2-dev-test-bootstrap-9fc4` at `17ac27f`. This section records 
 
 The fail-only re-run above passed at `fa016ed` only after a manual reseed of those four Local identities. `17ac27f` is that reseed. It has not been re-run on Local SB2 from this commit. Cloud reseed is unchanged, so Cloud next stays `>= 2000000000`.
 
+
+---
+
+## 2026-09-27 10:54 Asia/Rangoon (UTC+6:30) - Fail-only re-run after 17ac27f (no manual Local reseed)
+
+**Tester:** Nanda-HP (`e921257a-2870-4ad6-9b01-cfd6b497ecc4`)  
+**Repo:** `D:\Project\SB2-Cloud` = `Nanda-MND/SB2-Cloud`  
+**Branch:** `cursor/sb2-dev-test-bootstrap-9fc4`  
+**HEAD:** `08fbf0ba5a742bbaf2538e50df1f610bd7ae30c9` (`08fbf0b` - docs: map Suite A fail cells to the identity and soft-delete commits.)  
+**Ancestors:** `17ac27f`, `fa016ed`, `49dd869`, `4e81dd8`, `c71f1ca` all OK (no rewind).  
+**Evidence:** `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\new folder\failonly17_20260927_104650\` (not git-added)  
+**Marker:** `E2E_ALLTXN_20260927_105135`  
+**Constraints honored:** No bak restore; no SB.exe rebuild/replace; no Windows service SB.SyncAgent; no Live/Client; no SB2-git / Production MSSQL; passwords from env only (never printed); L2C inserts omit ID column (no IDENTITY_INSERT / no hardcoded 2000000000 on Local); **no manual Local reseed** (`17ac27f` SyncApply + LocalPendingFix only).
+
+### OVERALL: **PASS**
+
+Every required fail-only cell PASS; both DBs L2C Pending=0 and C2L Pending=0 after last `/once`. No Msg 2627. Cloud NEW IDs >=2e9 (not 1999999999). Local DETHARD/HEADSOFT Heads <<2e9.
+
+### Prep
+
+| Step | Result | Evidence |
+|------|--------|----------|
+| git fetch / checkout / pull --ff-only | PASS | HEAD `08fbf0b` (was behind 2 at `49dd869`; ff to `08fbf0b`) |
+| `SB2_Run_LocalPendingFix.ps1` (localhost/SB2/sa) | PASS (exit 0) | Fix_AllEntry ok=41 skip=2; Generic refreshed; UserStatus/ListViewItem off. ASSERT ReturnStockHead=4, ReturnStockDetail=1, GetStockHead=4, GetStockDetail=1. No abort `IDENT_CURRENT is still >= 1999999999`. |
+| `SB2_Run_CloudAfterRestore.ps1` (no `-EnableTxnC2L`) | PASS (exit 0) | Detail hard / Head soft OK; UserRights L2C-only (TestCloud). Cloud ReturnStockHead/GetStockHead IDENT_CURRENT=2000000004; Details=2000000000. |
+| `SB.SyncAgent\SB2_Dev_EncryptAndOnce.ps1` clean rebuild | PASS (exit 0) | Cleaned SyncAgent/SyncStatus bin+obj; Rebuild. Deployed Len=**27136**, SHA256=`CF5992040B20A586EC8C91754B9695F1A606039C0DFDE5C73AC4AC6F12F012BF`, LWT **2026-09-27 10:48:45 Asia/Rangoon**; `/once` completed. Extra `/once` drained 16 residual Cloud C2L Detail Op=D Pending left after CloudAfterRestore (742..966)  0. |
+| IDENT_CURRENT 4x2 pre-cells | PASS | Local RS/GS Head/Detail = 4/1/4/1 (<<2e9). Cloud = 2000000004/2000000000/2000000004/2000000000 (>=2e9). |
+| Pre-cell Pending=0 both | PASS | After drain `/once` |
+
+### Fail-only cells (do not re-run the 113 PASS cells)
+
+| Cell | Result | Evidence |
+|------|--------|----------|
+| ReturnStock_NEW_C2L | **PASS** | CloudHead=**2000000005** Detail=2000000001; Local present; zone2e9=True; fail1999=False; Pending0 |
+| GetStock_NEW_C2L | **PASS** | CloudHead=**2000000005** Detail=2000000001; Local present; zone2e9=True; fail1999=False; Pending0 |
+| ReturnStock_DETHARD_L2C | **PASS** | Local Head=**5** Detail=2 (<<2e9); no Msg 2627; both sides detail absent; Det Op=D left=0/0; Miss=0; Pending0. Auto-reseed via SyncApply after C2L (`17ac27f`) - no hand reseed. |
+| ReturnStock_HEADSOFT_L2C | **PASS** | Local Head=**6**; Op=**D** (not U); Src Deleted=1 IsDeleted=1 DeletedAt set; Cloud present 1/1; Det Op=D absent both; Pending0 |
+| GetStock_DETHARD_L2C | **PASS** | Local Head=**5** Detail=2; Labsent=0 Cabsent=0; Det Op=D left=0/0; Miss=0; Pending0 |
+| GetStock_HEADSOFT_L2C | **PASS** | Local Head=**6**; Op=D; Src 1/1; Cloud 1/1 present; Det Op=D absent; Pending0 |
+| StockReceive_EDIT_L2C | **PASS** | Head=**72**; CloudMatch=1; Pending0 |
+| SupplierOpening_EDIT_C2L | **PASS** | Head=**2000000005** zone2e9; LocalMatch=1; Pending0 |
+| ReturnReceive_HEADSOFT_C2L | **PASS** | Head=**2000000005**; OpD=1 Src=1 Local11=1 Present=1; Pending0 |
+| SaleHead 45634 (Cloud) | **PASS** | Deleted=**1**, IsDeleted=**1**, DeletedAt=**2026-09-27 03:18:34.843** (not null). Not hard-deleted. |
+
+### After last `/once` - Pending Direction/Status counts
+
+| DB | Pending/Syncing/DeadLetter | Other |
+|----|----------------------------|-------|
+| Local | **none** (L2C Pending=0, C2L Pending=0) | L2C Synced=401 |
+| Cloud | **none** (L2C Pending=0, C2L Pending=0) | C2L Synced=249; L2C Synced=216; C2L Conflict=2 (pre-existing; not Pending) |
+
+### Notes for engineers
+
+1. **`17ac27f` verified without manual Local reseed.** Prior fa016ed fail-only PASS required Tester hand-reseed of ReturnStock*/GetStock* to MAX(ID)<1999999999. This run used only LocalPendingFix ASSERT + SyncApply_Generic post-C2L pull-down; L2C Local Heads landed at 5/6 (<<2e9), no Msg 2627.
+2. CloudAfterRestore can leave Cloud C2L Detail Op=D Pending; EncryptAndOnce `/once` alone may not drain them all if cycle timing races - one extra `/once` cleared 160 before baseline.
+3. EncryptAndOnce bin/obj dirt discarded (not committed). Evidence folder not git-added.
+
+### Sign-off
+
+- **OVERALL PASS**
+- HEAD: `08fbf0b` (contains `17ac27f` / `fa016ed`)
+- Results-only commit follows.
+
