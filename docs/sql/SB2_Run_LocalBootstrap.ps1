@@ -70,7 +70,8 @@ $forbiddenHere = @(
     'Deploy_TxnDetail_HardDeleteSync_CLOUD.sql',
     'Deploy_EditDeleteSync_CLOUD.sql',
     'Cloud_Reseed_TransactionIdRanges.sql',
-    'SB2_Close_RestoredCloud_L2C_Outbox.sql'
+    'SB2_Close_RestoredCloud_L2C_Outbox.sql',
+    'SB2_Repair_HeadSoftDelete_Flags_CLOUD.sql'
 )
 foreach ($name in $forbiddenHere) {
     if ($required -contains $name) {

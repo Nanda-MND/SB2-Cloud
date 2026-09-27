@@ -40,6 +40,7 @@ $scripts = @(
     'DataSync_UserRights_L2C_Only.sql',
     'Cloud_Reseed_TransactionIdRanges.sql',
     'Fix_AllTxn_Cloud_C2L_Capture.sql',
+    'SB2_Repair_HeadSoftDelete_Flags_CLOUD.sql',
     'SB2_Disable_UserStatus_And_Listview_Sync.sql',
     'Cloud_UserStatus_GhostCleanup.sql'
 )
@@ -59,7 +60,7 @@ $scripts += @(
     'SB2_Assert_DetailHardDelete.sql'
 )
 
-$banned = @('DataSync_11_RunLocal.sql', 'Deploy_TxnDetail_HardDeleteSync_LOCAL.sql', 'Deploy_EditDeleteSync_LOCAL.sql', 'DataSync_UserRights_L2C_Only_Local.sql')
+$banned = @('DataSync_11_RunLocal.sql', 'Deploy_TxnDetail_HardDeleteSync_LOCAL.sql', 'Deploy_EditDeleteSync_LOCAL.sql', 'DataSync_UserRights_L2C_Only_Local.sql', 'SB2_Reseed_LocalIdentity_BelowCloudFloor.sql')
 foreach ($name in $banned) {
     if ($scripts -contains $name) {
         throw "Test Cloud runner must not execute $name."

@@ -398,7 +398,11 @@ SELECT ' + @insVals2;
                 EXEC sp_executesql @reseedSql,
                     N'@m bigint OUTPUT, @floor bigint',
                     @m = @maxLocalZone OUTPUT, @floor = @CloudFloor;
-                IF @maxLocalZone > 0
+                -- No local-zone row yet: reseed to 0 so the next Local insert is 1.
+                -- Skipping the reseed left IDENT_CURRENT at 2e9 and the next insert collided.
+                IF @maxLocalZone IS NULL OR @maxLocalZone < 0
+                    SET @maxLocalZone = 0;
+                IF @maxLocalZone < @CloudFloor
                 BEGIN
                     DECLARE @reseedCmd nvarchar(max) =
                         N'DBCC CHECKIDENT (' + QUOTENAME(@TableName, N'''') + N', RESEED, '

@@ -1,12 +1,15 @@
 #Requires -Version 5.1
 <#
-  Dev Local only (localhost / SB2). Does not reseed identities and does not
-  requeue PurchaseHead deletes.
+  Dev Local only (localhost / SB2). Does not reseed Local identities up to
+  2000000000. If C2L left an identity in the cloud zone, it is pulled down.
+  Does not requeue PurchaseHead deletes.
 
   1) Refresh SyncInstall_Table and reinstall entry L2C triggers.
      Head Deleted=1 enqueues Op=D, and the source row gets IsDeleted=1.
   2) Redeploy SyncApply_Generic so Head Op=D soft-applies (int PK vs sql_variant).
-  3) Turn UserStatus and ListviewItem sync off and clear their pending outbox.
+  3) Pull Local identities that were bumped to the cloud zone back below 2000000000.
+     Never reseeds Local up to that floor.
+  4) Turn UserStatus and ListviewItem sync off and clear their pending outbox.
 
   Password: -Password or env SB2_DEV_LOCAL_SQL_PASSWORD. Never written to disk.
 #>
@@ -31,6 +34,7 @@ $files = @(
     'DataSync_11_AllTables_Install.sql',
     'Fix_AllEntry_Local_L2C_Capture.sql',
     'DataSync_10_SyncApply_Generic.sql',
+    'SB2_Reseed_LocalIdentity_BelowCloudFloor.sql',
     'SB2_Disable_UserStatus_And_Listview_Sync.sql'
 )
 
@@ -49,7 +53,7 @@ if ($generic -notmatch 'preserve-soft-delete-flags') {
 }
 
 Write-Host "Dev Local pending fix on $Server / $Database"
-Write-Host 'UserStatus and ListviewItem sync off. Head Op=D stays a soft delete. No identity reseed.'
+Write-Host 'UserStatus and ListviewItem sync off. Head Op=D stays a soft delete. Local identities above the cloud floor are pulled down.'
 
 Invoke-Sb2SqlFiles -Server $Server -Database $Database -User $User -Password $Password -SqlDir $PSScriptRoot -Files $files
 

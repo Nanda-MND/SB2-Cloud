@@ -18,6 +18,11 @@
   Table list matches Fix_AllTxn_Cloud_C2L_Capture.sql (Sale/Purchase/Transfer
   plus ReturnReceive, StockOpening, RawIssue, FinishGoods, ReturnStock, GetStock,
   openings, CustSupTransfer). Missing tables SKIP. Never run on Local SB2.
+
+  A table that has never generated an identity is reseeded TO the floor, because
+  SQL Server uses the reseed value itself as the first insert. Reseed to floor-1
+  on those tables inserted 1999999999 (ReturnStock / GetStock). Tables that
+  already generated an identity are reseeded to floor-1 so the next insert is the floor.
 */
 
 SET NOCOUNT ON;
@@ -77,7 +82,7 @@ INSERT @tables (TableName, Sort) VALUES
     (N'CustSupTransfer', 220);
 
 DECLARE @t sysname, @obj int, @idCol sysname, @sql nvarchar(max);
-DECLARE @maxId bigint, @ident bigint, @newSeed bigint;
+DECLARE @maxId bigint, @ident bigint, @newSeed bigint, @generated bit;
 
 DECLARE cur CURSOR LOCAL FAST_FORWARD FOR
     SELECT TableName FROM @tables ORDER BY Sort;
@@ -109,22 +114,27 @@ BEGIN
 
     SET @ident = IDENT_CURRENT(N'dbo.' + @t);
 
+    -- last_value is NULL until an identity value has actually been generated.
+    -- IDENT_CURRENT still returns the seed (often 1) in that case.
+    -- DBCC CHECKIDENT RESEED: if identity was never generated, the first insert
+    -- IS the reseed value (not +1). Reseed to floor-1 then inserts 1999999999,
+    -- which is outside the cloud zone. ReturnStock/GetStock hit that.
+    -- If identity was generated, the next insert is reseed+1, so floor-1 yields the floor.
+    SET @generated = 0;
+    SELECT @generated = CASE WHEN ic.last_value IS NULL THEN 0 ELSE 1 END
+    FROM sys.identity_columns ic
+    WHERE ic.object_id = @obj;
+
     IF @maxId >= @CloudFloor
     BEGIN
         PRINT N'WARN ' + @t + N': MAX(ID)=' + CAST(@maxId AS nvarchar(20))
             + N' already >= CloudFloor. Raising seed above MAX.';
-        SET @newSeed = @maxId;  -- CHECKIDENT RESEED sets next = value+1 on next insert behavior varies; use max
-    END
-    ELSE
-        SET @newSeed = @CloudFloor - 1; -- next insert typically CloudFloor when reseed to floor-1... 
-    -- SQL Server: DBCC CHECKIDENT (table, RESEED, new_reseed_value)
-    -- Next identity = new_reseed_value + 1 when rows exist; if reseed to N, next is N+1.
-    -- We want next ID >= @CloudFloor → RESEED (@CloudFloor - 1) when empty/low, or RESEED(@maxId) if max higher.
-
-    IF @maxId >= @CloudFloor
         SET @newSeed = @maxId;          -- next ≈ max+1
+    END
+    ELSE IF @generated = 0 AND @maxId = 0
+        SET @newSeed = @CloudFloor;     -- first insert = floor, never floor-1
     ELSE
-        SET @newSeed = @CloudFloor - 1; -- next ≈ CloudFloor
+        SET @newSeed = @CloudFloor - 1; -- next insert = floor
 
     IF @newSeed + 1 > @IntMax
     BEGIN
@@ -136,8 +146,9 @@ BEGIN
     PRINT N'--- ' + @t + N'.' + @idCol
         + N' MAX=' + CAST(@maxId AS nvarchar(20))
         + N' IDENT_CURRENT=' + CAST(@ident AS nvarchar(20))
+        + N' generated=' + CAST(@generated AS nvarchar(5))
         + N' → RESEED ' + CAST(@newSeed AS nvarchar(20))
-        + N' (next ~' + CAST(@newSeed + 1 AS nvarchar(20)) + N')';
+        + N' (next ~' + CAST(CASE WHEN @generated = 0 AND @maxId = 0 AND @maxId < @CloudFloor THEN @newSeed ELSE @newSeed + 1 END AS nvarchar(20)) + N')';
 
     IF @DryRun = 0
     BEGIN
@@ -161,7 +172,8 @@ SELECT
     CASE
         WHEN OBJECT_ID(N'dbo.' + t.TableName) IS NULL THEN N'MISSING'
         WHEN IDENT_CURRENT(N'dbo.' + t.TableName) IS NULL THEN N'NO_IDENTITY'
-        WHEN IDENT_CURRENT(N'dbo.' + t.TableName) >= @CloudFloor - 1 THEN N'OK_CLOUD_ZONE'
+        WHEN IDENT_CURRENT(N'dbo.' + t.TableName) >= @CloudFloor THEN N'OK_CLOUD_ZONE'
+        WHEN IDENT_CURRENT(N'dbo.' + t.TableName) = @CloudFloor - 1 THEN N'OK_NEXT_AT_FLOOR'
         ELSE N'BELOW_FLOOR'
     END AS Status
 FROM @tables t

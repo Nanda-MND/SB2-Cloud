@@ -77,7 +77,8 @@ namespace SB.SyncAgent
             long outboxId = Convert.ToInt64(row["OutboxID"]);
             string table = row["TableName"].ToString();
             Exception last = null;
-            for (int attempt = 1; attempt <= 2; attempt++)
+            const int maxAttempts = 3;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 try
                 {
@@ -112,9 +113,10 @@ namespace SB.SyncAgent
                 catch (Exception ex)
                 {
                     last = ex;
-                    if (attempt == 1 && ConnectionNeedsReopen(source, target, ex))
+                    bool transport = ConnectionNeedsReopen(source, target, ex) || IsTransportError(ex);
+                    if (attempt < maxAttempts && transport)
                     {
-                        Log((push ? "Push" : "Pull") + " retry OutboxID=" + outboxId + " " + table + " after closed connection.");
+                        Log((push ? "Push" : "Pull") + " retry " + attempt + " OutboxID=" + outboxId + " " + table + " after transport error.");
                         TryReopen(source);
                         TryReopen(target);
                         continue;
@@ -175,6 +177,45 @@ namespace SB.SyncAgent
                 return true;
             string message = ex == null ? "" : ex.Message;
             return message.IndexOf("current state is closed", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsTransportError(Exception ex)
+        {
+            for (Exception cur = ex; cur != null; cur = cur.InnerException)
+            {
+                SqlException sql = cur as SqlException;
+                if (sql != null)
+                {
+                    foreach (SqlError err in sql.Errors)
+                    {
+                        switch (err.Number)
+                        {
+                            case -2:     // timeout
+                            case 53:     // network path not found
+                            case 64:     // named pipe
+                            case 233:    // no process on pipe
+                            case 10053:
+                            case 10054:
+                            case 10060:
+                            case 40197:
+                            case 40501:
+                            case 40613:
+                                return true;
+                        }
+                    }
+                }
+
+                string message = cur.Message ?? "";
+                if (message.IndexOf("Named Pipes", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("transport-level", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("TCP Provider", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("SSL Provider", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("pre-login", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("timeout expired", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("network-related", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+            return false;
         }
 
         private static string SafeDatabaseName(SqlConnection cnn)
