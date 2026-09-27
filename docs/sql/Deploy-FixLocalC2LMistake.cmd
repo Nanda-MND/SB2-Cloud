@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM Fix mistaken C2L deploy on Local — restore L2C capture
 
 set SERVER=Server\SB1

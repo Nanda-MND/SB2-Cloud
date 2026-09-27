@@ -27,7 +27,7 @@ SB Main history (`dlvHistory` / FastObjectListView) was upgraded for:
 | `SB/frm_Main.Designer.cs` | `dlvHistory` (ObjectListView), `statusStrip1`, `tspbHistoryLoad`, footer labels (`tslbMachine`, `tsLabelPaid`, `tsLablePK`, `tslbBankCharges`, Spring label) |
 | `SB/frm_List.cs` (+ Designer) | Popup list uses same helper |
 | `SB/frm_Setup.cs` / `frm_CodeList.cs` | Other ObjectListView binds using helper |
-| `SB/SB.csproj` | Reference `ObjectListView.dll` (fix HintPath for SB2-Cloud; prefer `packages/` or `lib/ObjectListView.dll` in-repo) |
+| `SB/SB.csproj` | `ObjectListView` HintPath is `..\lib\ObjectListView.dll` (in this repo). Do not use `D:\Project\777\...`. |
 | `docs/sql/Sales_Listview_NarrowCarDiscount.sql` | Dev Local (+ Test Cloud after restore) `ListviewItem` width updates for Sales |
 
 ### Related docs
@@ -72,6 +72,14 @@ SB Main history (`dlvHistory` / FastObjectListView) was upgraded for:
 - [ ] `PrepareForLayoutChange` / generation guard so stale async fills do not bind wrong menu
 - [ ] Filter typing combos still work (`DropDown` style) without regressing ListView bind
 - [ ] Menu switch feels fast (no full grid recreate when layout cache allows)
+
+## How Tester opens it
+
+1. Pull `cursor/sb2-dev-test-bootstrap-9fc4`.
+2. Open `SB.sln`. Startup project is `SB`.
+3. F5. Use menus Sales, Cashbook, and Balance.
+4. Do not copy `SB2-git` `Bin\Debug` over `SB\bin\Debug`.
+5. Mark H1–H8 only after that window is used. Code inspection is not PASS.
 
 ## Dev / Test verification (add to `SB2_DEV_TEST_RESULTS`)
 

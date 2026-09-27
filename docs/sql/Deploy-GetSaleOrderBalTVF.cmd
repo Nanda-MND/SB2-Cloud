@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM Deploy GetSaleOrderBalSales TVF fix to a SQL Server database.
 REM Usage: Deploy-GetSaleOrderBalTVF.cmd
 REM   Local: Server\SB1 / SB1

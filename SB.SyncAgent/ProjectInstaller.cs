@@ -16,9 +16,9 @@ namespace SB.SyncAgent
 
             var service = new ServiceInstaller
             {
-                ServiceName = "SB.SyncAgent",
-                DisplayName = "SB Data Sync Agent",
-                Description = "Syncs Local ERP database to Cloud (site4now.net)",
+                ServiceName = "SB2.SyncAgent.Dev",
+                DisplayName = "SB2 Data Sync Agent (Dev)",
+                Description = "Syncs Dev Local SB2 to Test Cloud only. Do not install against live or client endpoints.",
                 StartType = ServiceStartMode.Automatic
             };
 

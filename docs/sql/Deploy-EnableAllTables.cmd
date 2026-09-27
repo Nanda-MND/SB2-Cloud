@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 setlocal EnableExtensions
 REM Enable ALL ERP table sync + seed existing rows on Local.
 REM Run on CLIENT PC. SyncAgent can keep running.

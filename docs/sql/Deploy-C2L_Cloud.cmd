@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM C2L deploy — CLOUD ONLY (db_abbe78_warehouse)
 REM Home insert/update → Cloud SyncOutbox (C2L) → Office Sync Agent → Local
 REM Run from any PC that can reach site4now (home or office).

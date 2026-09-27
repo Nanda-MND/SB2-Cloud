@@ -19,11 +19,13 @@ namespace SB.SyncAgent
             var engine = new RC4Engine { EncryptionKey = EncryptKey, CryptedText = tmp };
             if (!engine.Decrypt())
                 throw new InvalidOperationException("Failed to decrypt " + fileName);
+            DevTestGuard.RejectIfForbidden(engine.InClearText);
             return engine.InClearText;
         }
 
         public static void WriteEncrypted(string fileName, string connectionString)
         {
+            DevTestGuard.RejectIfForbidden(connectionString);
             var engine = new RC4Engine { EncryptionKey = EncryptKey, InClearText = connectionString };
             if (!engine.Encrypt())
                 throw new InvalidOperationException("Failed to encrypt connection string.");

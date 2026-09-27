@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM Run from YOUR PC (SSMS network) or any machine that can reach site4now Cloud SQL.
 
 set SERVER=SQL1002.site4now.net

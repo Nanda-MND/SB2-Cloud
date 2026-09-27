@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 REM Monitor Local sync progress. Run on client PC.
 setlocal
 

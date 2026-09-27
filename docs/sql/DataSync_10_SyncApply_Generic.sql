@@ -65,6 +65,18 @@ BEGIN
     INNER JOIN sys.types ty ON c.user_type_id = ty.user_type_id
     WHERE c.object_id = @obj AND c.name = @pk;
 
+    IF @pkType IS NULL
+    BEGIN
+        RAISERROR(N'SyncApply_Generic: PK type missing on %s.', 16, 1, @TableName);
+        RETURN;
+    END
+
+    -- JSON_VALUE is nvarchar. Comparing that sql_variant to an int PK throws
+    -- ("Implicit conversion from data type sql_variant") and leaves Op=D Pending.
+    -- Head Op=D stays a soft IsDeleted update. Detail Op=D stays a hard DELETE.
+    DECLARE @pkPred nvarchar(400) =
+        QUOTENAME(@pk) + N' = TRY_CAST(JSON_VALUE(@pkjson, ''$.' + REPLACE(@pk, N'''', N'''''') + N''') AS ' + @pkType + N')';
+
     IF @Source = 'Cloud'
     BEGIN
         IF EXISTS (
@@ -96,8 +108,9 @@ BEGIN
     BEGIN
         DECLARE @localMod datetime2(3);
         DECLARE @chk nvarchar(max) = N'SELECT @m = SyncModifiedAt FROM ' + QUOTENAME(@TableName) +
-            N' WHERE ' + QUOTENAME(@pk) + N' = @id';
-        EXEC sp_executesql @chk, N'@m datetime2(3) OUTPUT, @id sql_variant', @m = @localMod OUTPUT, @id = @pkVal;
+            N' WHERE ' + @pkPred;
+        EXEC sp_executesql @chk, N'@m datetime2(3) OUTPUT, @pkjson nvarchar(500)',
+            @m = @localMod OUTPUT, @pkjson = @PrimaryKeyJson;
         IF @localMod IS NOT NULL AND @localMod > @RemoteModifiedAt
         BEGIN
             -- Cloud-zone IDs (>= 2e9) are Cloud-authored. Timestamp LocalWins permanently
@@ -115,9 +128,9 @@ BEGIN
                 IF COL_LENGTH(@TableName, 'IsDeleted') IS NOT NULL
                     SET @softSql += N' OR ISNULL(IsDeleted,0) <> 0';
                 SET @softSql += N' THEN 1 ELSE 0 END FROM ' + QUOTENAME(@TableName) +
-                    N' WHERE ' + QUOTENAME(@pk) + N' = @id';
-                EXEC sp_executesql @softSql, N'@s bit OUTPUT, @id sql_variant',
-                    @s = @localSoftDeleted OUTPUT, @id = @pkVal;
+                    N' WHERE ' + @pkPred;
+                EXEC sp_executesql @softSql, N'@s bit OUTPUT, @pkjson nvarchar(500)',
+                    @s = @localSoftDeleted OUTPUT, @pkjson = @PrimaryKeyJson;
             END
 
             IF @isCloudZonePk = 0 AND NOT (@localSoftDeleted = 1 AND @isDelete = 0)
@@ -150,8 +163,9 @@ BEGIN
             IF COL_LENGTH(@TableName, 'SyncModifiedAt') IS NOT NULL SET @delSql += N', SyncModifiedAt = @ts';
             IF COL_LENGTH(@TableName, 'SyncOrigin') IS NOT NULL
                 SET @delSql += N', SyncOrigin = ' + CASE WHEN @Source = 'Local' THEN N'1' ELSE N'2' END;
-            SET @delSql += N' WHERE ' + QUOTENAME(@pk) + N' = @id';
-            EXEC sp_executesql @delSql, N'@ts datetime2(3), @id sql_variant', @ts = @RemoteModifiedAt, @id = @pkVal;
+            SET @delSql += N' WHERE ' + @pkPred;
+            EXEC sp_executesql @delSql, N'@ts datetime2(3), @pkjson nvarchar(500)',
+                @ts = @RemoteModifiedAt, @pkjson = @PrimaryKeyJson;
             -- Soft-delete no-op (0 rows) must not report Applied for C2L.
             IF @Source = N'Cloud' AND @@ROWCOUNT = 0
             BEGIN
@@ -178,8 +192,8 @@ SELECT @x = CASE WHEN EXISTS (
             -- Hard DELETE for *Detail (and any table without IsDeleted).
             BEGIN TRY EXEC sp_set_session_context @key = N'SyncAllowPhysicalDelete', @value = 1; END TRY BEGIN CATCH END CATCH;
             DECLARE @hardDel nvarchar(max) = N'DELETE FROM ' + QUOTENAME(@TableName) +
-                N' WHERE ' + QUOTENAME(@pk) + N' = @id';
-            EXEC sp_executesql @hardDel, N'@id sql_variant', @id = @pkVal;
+                N' WHERE ' + @pkPred;
+            EXEC sp_executesql @hardDel, N'@pkjson nvarchar(500)', @pkjson = @PrimaryKeyJson;
             BEGIN TRY EXEC sp_set_session_context @key = N'SyncAllowPhysicalDelete', @value = NULL; END TRY BEGIN CATCH END CATCH;
         END
         SET @Applied = 1;
@@ -367,30 +381,33 @@ SELECT ' + @insVals2;
         IF @hasIdentity = 1
             EXEC(N'SET IDENTITY_INSERT ' + @qualifiedTable + N' OFF;');
 
-        -- C2L into Local: IDENTITY_INSERT of ID >= 2e9 bumps IDENT_CURRENT into Cloud zone.
-        -- Reseed Local identity back to MAX(ID) below Cloud floor so new Local inserts stay low.
+        -- C2L into Local: IDENTITY_INSERT of ID >= 2e9 bumps IDENT_CURRENT into the cloud zone.
+        -- L2C inserts omit the ID column. Never IDENTITY_INSERT a 2e9 ID on Local.
+        -- Pull Local identity to MAX(ID) below the 1999999999 sentinel so the next
+        -- local insert cannot land on 1999999999 or 2000000000.
         IF @hasIdentity = 1 AND @Source = N'Cloud' AND @insRows > 0
            AND @pkType IN (N'int', N'bigint', N'smallint', N'tinyint')
         BEGIN
             DECLARE @CloudFloor bigint = 2000000000;
+            DECLARE @LocalCeiling bigint = 1999999999;
             DECLARE @insertedId bigint = TRY_CAST(JSON_VALUE(@PrimaryKeyJson, N'$.' + @pk) AS bigint);
             IF @insertedId IS NOT NULL AND @insertedId >= @CloudFloor
             BEGIN
                 DECLARE @maxLocalZone bigint;
                 DECLARE @reseedSql nvarchar(max) =
-                    N'SELECT @m = ISNULL(MAX(CAST(' + QUOTENAME(@pk) + N' AS bigint)), 0)
+                    N'SELECT @m = MAX(CAST(' + QUOTENAME(@pk) + N' AS bigint))
                       FROM ' + @qualifiedTable + N'
-                      WHERE CAST(' + QUOTENAME(@pk) + N' AS bigint) < @floor';
+                      WHERE CAST(' + QUOTENAME(@pk) + N' AS bigint) < @ceiling';
                 EXEC sp_executesql @reseedSql,
-                    N'@m bigint OUTPUT, @floor bigint',
-                    @m = @maxLocalZone OUTPUT, @floor = @CloudFloor;
-                IF @maxLocalZone > 0
-                BEGIN
-                    DECLARE @reseedCmd nvarchar(max) =
-                        N'DBCC CHECKIDENT (' + QUOTENAME(@TableName, N'''') + N', RESEED, '
-                        + CAST(@maxLocalZone AS nvarchar(30)) + N') WITH NO_INFOMSGS';
-                    EXEC(@reseedCmd);
-                END
+                    N'@m bigint OUTPUT, @ceiling bigint',
+                    @m = @maxLocalZone OUTPUT, @ceiling = @LocalCeiling;
+                -- No true-local row: reseed to 0 so the next Local insert is 1.
+                IF @maxLocalZone IS NULL OR @maxLocalZone < 0 OR @maxLocalZone >= @LocalCeiling
+                    SET @maxLocalZone = 0;
+                DECLARE @reseedCmd nvarchar(max) =
+                    N'DBCC CHECKIDENT (' + QUOTENAME(@TableName, N'''') + N', RESEED, '
+                    + CAST(@maxLocalZone AS nvarchar(30)) + N') WITH NO_INFOMSGS';
+                EXEC(@reseedCmd);
             END
         END
     END

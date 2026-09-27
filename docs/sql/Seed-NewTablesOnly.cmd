@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 setlocal EnableExtensions
 REM Safe seed — NEW tables only. Skips Sale/Purchase already in outbox.
 cd /d "%~dp0"

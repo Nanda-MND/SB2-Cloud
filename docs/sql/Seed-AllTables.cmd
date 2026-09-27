@@ -1,4 +1,6 @@
 @echo off
+call "%~dp0SB2_RefuseLive.cmd"
+exit /b 1
 setlocal EnableExtensions
 REM Seed outbox for all enabled tables - run after Deploy-EnableAllTables.
 cd /d "%~dp0"

@@ -159,10 +159,15 @@ BEGIN
         WHERE d.' + QUOTENAME(@pk) + N' IS NULL
            OR (i.SyncModifiedAt = d.SyncModifiedAt AND ISNULL(i.SyncModifiedBy, -1) = ISNULL(d.SyncModifiedBy, -1))
     ) RETURN;
+    -- Nested SyncModifiedAt update must not enqueue Op=U over a head soft-delete Op=D.
+    -- Marker: suppressNestedOutbox
+    DECLARE @prevOutbox sql_variant = SESSION_CONTEXT(N''SyncSuppressOutbox'');
     EXEC sp_set_session_context @key = N''SyncSuppressMetadata'', @value = 1;
+    EXEC sp_set_session_context @key = N''SyncSuppressOutbox'', @value = 1;
     UPDATE t SET t.SyncModifiedAt = sysutcdatetime(), t.SyncModifiedBy = COALESCE(i.SyncModifiedBy, t.SyncModifiedBy)
     FROM ' + QUOTENAME(@TableName) + N' t
     INNER JOIN inserted i ON i.' + QUOTENAME(@pk) + N' = t.' + QUOTENAME(@pk) + N';
+    EXEC sp_set_session_context @key = N''SyncSuppressOutbox'', @value = @prevOutbox;
 END';
     EXEC sp_executesql @sql;
 
@@ -178,18 +183,23 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    IF SESSION_CONTEXT(N''SyncSuppressMetadata'') = 1 RETURN;
+    -- Do not bail on SyncSuppressMetadata. The metadata trigger sets that flag
+    -- and would leave the source row IsDeleted=0 after Deleted=1.
+    -- Marker: headSoftDeleteIsDeleted
     IF NOT EXISTS (
         SELECT 1 FROM inserted i INNER JOIN deleted d ON d.' + QUOTENAME(@pk) + N' = i.' + QUOTENAME(@pk) + N'
         WHERE ISNULL(i.Deleted, 0) <> 0 AND ISNULL(d.Deleted, 0) = 0
     ) RETURN;
+    DECLARE @prevOutbox sql_variant = SESSION_CONTEXT(N''SyncSuppressOutbox'');
     EXEC sp_set_session_context @key = N''SyncSuppressMetadata'', @value = 1;
+    EXEC sp_set_session_context @key = N''SyncSuppressOutbox'', @value = 1;
     UPDATE t SET t.IsDeleted = 1,
         t.DeletedAt = COALESCE(t.DeletedAt, i.DeletedAt, sysutcdatetime()),
         t.DeletedBy = COALESCE(t.DeletedBy, i.DeletedBy, i.SyncModifiedBy)
     FROM ' + QUOTENAME(@TableName) + N' t
     INNER JOIN inserted i ON i.' + QUOTENAME(@pk) + N' = t.' + QUOTENAME(@pk) + N'
     WHERE ISNULL(i.Deleted, 0) <> 0 AND ISNULL(t.IsDeleted, 0) = 0;
+    EXEC sp_set_session_context @key = N''SyncSuppressOutbox'', @value = @prevOutbox;
 END';
         EXEC sp_executesql @sql;
     END

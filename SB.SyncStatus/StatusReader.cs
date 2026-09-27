@@ -8,7 +8,7 @@ namespace SB.SyncStatus
 {
     internal static class StatusReader
     {
-        private const string AgentServiceName = "SB.SyncAgent";
+        private const string AgentServiceName = "SB2.SyncAgent.Dev";
 
         public static StatusSnapshot Read()
         {

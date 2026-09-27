@@ -7,7 +7,7 @@ namespace SB.SyncStatus
     internal static class StartupHelper
     {
         private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        private const string ValueName = "SB.SyncStatus";
+        private const string ValueName = "SB2.SyncStatus.Dev";
 
         public static string ExePath
         {
