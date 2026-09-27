@@ -250,3 +250,18 @@ Every required fail-only cell PASS; both DBs L2C Pending=0 and C2L Pending=0 aft
 - HEAD: `fa016ed`
 - Results-only commit follows.
 
+---
+
+## 2026-09-27 — Suite A 9 FAIL cells: fix commits
+
+Code on `cursor/sb2-dev-test-bootstrap-9fc4` at `17ac27f`. This section records the commits. It is not a new matrix run.
+
+| Target | Commit | What changed |
+|--------|--------|----------------|
+| ReturnStock_NEW_C2L, GetStock_NEW_C2L landed at CloudHead `1999999999` | `fa016ed` | `Cloud_Reseed_TransactionIdRanges.sql` reseeds a never-generated identity to `2000000000`. ReturnStock and GetStock Head/Detail are in that list. `SB2_Run_CloudAfterRestore.ps1` runs it. |
+| ReturnStock/GetStock DETHARD and HEADSOFT L2C Msg 2627 on Local ID `2000000000` | `fa016ed`, tightened by `17ac27f` | L2C inserts omit the ID column. After C2L, Local identity is pulled to `MAX(ID)` where `ID < 1999999999` (or `0` when no true-local row exists). `LocalPendingFix` aborts if ReturnStock/GetStock Head or Detail `IDENT_CURRENT` is still `>= 1999999999`. |
+| SaleHead 45634 Cloud `Deleted=1` `IsDeleted=0` | `4f35d2e`, repair in `fa016ed` | Head `Deleted=1` sets source `IsDeleted=1` and `DeletedAt` and enqueues Op=D. `SB2_Repair_HeadSoftDelete_Flags_CLOUD.sql` repairs older Cloud rows, including 45634, and does not queue outbox. |
+| StockReceive_EDIT_L2C, SupplierOpening_EDIT_C2L, ReturnReceive_HEADSOFT_C2L transport timeouts | `fa016ed` | `SyncEngine` retries a row up to 3 times on TCP, SSL, Named Pipes, or timeout (`maxAttempts = 3`). |
+
+The fail-only re-run above passed at `fa016ed` only after a manual reseed of those four Local identities. `17ac27f` is that reseed. It has not been re-run on Local SB2 from this commit. Cloud reseed is unchanged, so Cloud next stays `>= 2000000000`.
+
