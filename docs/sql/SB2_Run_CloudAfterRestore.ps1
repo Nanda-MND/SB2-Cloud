@@ -6,6 +6,8 @@
   UserStatus and ListviewItem are not synced. Cloud identity reseed runs here (never on Local).
   Restored Direction=L2C outbox copies are closed. C2L rows are left for the agent.
   Refuses SB1 and the production cloud host.
+  Manual pack, same order, no -EnableTxnC2L: SB2_CloudAfterRestore_Ordered.sql
+  One-click: SB2_Run_OneClick_Deploy.ps1 -Phase Cloud
 
   Password: -Password or env SB2_TEST_CLOUD_SQL_PASSWORD. Never written to disk.
   -EnableTxnC2L adds Sale/Purchase/Transfer C2L packs, then re-asserts UserRights L2C-only.
