@@ -1,6 +1,60 @@
-﻿# SB2-Cloud Dev / Test acceptance results
+# SB2-Cloud Dev / Test acceptance results
 
-## Current summary (2026-09-27)
+## Current summary (2026-09-27 Suite A full all-txn matrix)
+
+Date: 2026-09-27 ~11:56 Asia/Rangoon (UTC+6:30)
+HEAD at run start: `0591d2d` (`0591d2d9e20cdf8d365fbc7dd7db940e2221c8bc`)
+Branch: `cursor/sb2-dev-test-bootstrap-9fc4`
+Machine: Nanda-HP (`e921257a-2870-4ad6-9b01-cfd6b497ecc4`)
+Runtime: `D:\Dev\SB2-Cloud-Runtime\`
+Evidence: `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\all_txn_20260927_112115\`
+Marker: `E2E_ALLTXN_20260927_113115`
+Targets: Local `localhost` / `SB2` (sa); Cloud `tcp:sql8006.site4now.net,1433` / `db_abe8c0_sb2`
+No Production/SQL1002/warehouse/Live/Client/SB2-git. No SB.exe rebuild. No Windows service. Passwords from env only (never printed).
+
+### OVERALL: **PASS**
+
+| Metric | Count |
+|--------|------:|
+| PASS | **122** |
+| FAIL | **0** |
+| SKIP | **6** |
+| Final Pending (Local L2C/C2L/Syn/Dead) | **0/0/0/0** |
+| Final Pending (Cloud L2C/C2L/Syn/Dead) | **0/0/0/0** |
+
+**FAIL names:** _(none)_
+
+### Prep
+
+| Step | Result |
+|------|--------|
+| Pull ff-only; HEAD `0591d2d` or descendant; did not rewind past `17ac27f`/`fa016ed`/`83c9288`/`4e81dd8`/`c71f1ca` | PASS (HEAD=`0591d2d`; all five ancestors present) |
+| `docs/sql/SB2_Run_LocalPendingFix.ps1` on localhost/SB2 | PASS exit 0; ASSERT GetStock/ReturnStock Head+Detail IDENT_CURRENT all `<< 1999999999` |
+| `docs/sql/SB2_Run_CloudAfterRestore.ps1` (no `-EnableTxnC2L`) | PASS exit 0; Detail hard / Head soft OK; UserRights L2C-only (TestCloud) |
+| `SB.SyncAgent/SB2_Dev_EncryptAndOnce.ps1` clean Rebuild | PASS; Len=27136 SHA256=`612E6C8FFF0319EAE8A4E8CFDDC7DF7E35A06B2A9CE7B14BDB7A11DB2854D5B8` LWT 2026-09-27 11:24:00 Asia/Rangoon |
+| Pre-matrix Pending 0 both sides L2C+C2L (+Syncing/Dead) | PASS (after reset of 82 stale Cloud C2L PurchaseHead Op=D Syncing leftovers from interrupted prior cycle, then one `/once` drain) |
+
+### SKIP (tables absent / N/A only - not invented PASS)
+
+| Cell | Reason |
+|------|--------|
+| Journal_META | JournalHead/JournalDetail tables absent |
+| Manufacture_META | ManufactureHead/ManufactureDetail absent (use RawIssue/FinishGoods) |
+| Stock_META | No StockHead; covered as StockReceive family |
+| CustSupTransfer_DETHARD_L2C | No Detail table |
+| CustSupTransfer_DETHARD_C2L | No Detail table |
+| CONFLICT_C4_CollidingID | IDs identity-unique; Cloud >=2e9 Local <<2e9; no IDENTITY_INSERT path |
+
+### Notes
+
+- Runner: `Run_SuiteA_AllTxn_Matrix.ps1` copied into the dated evidence folder from prior `all_txn_20260926_225738` (not in git tree); `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\all_txn_20260927_112115` retargeted; Cloud endpoint hardened to `tcp:...1433` + sqlcmd `-C`.
+- L2C inserts omitted ID column; no Local IDENTITY_INSERT 2e9.
+- One transport retry on `/once` TCP/SSL flakes allowed by runner (up to 3 attempts).
+- Full Suite A all-txn matrix (not fail-only). Prior 2026-09-26 all-txn was PASS=113 FAIL=9 SKIP=6; this retest is **PASS=122 FAIL=0 SKIP=6**.
+- Evidence stays on disk only under `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\` (not committed).
+
+---
+## Prior summary (2026-09-27 fail-only)
 
 This section is the current status. It supersedes the 2026-09-26 23:08 “Suite A IN PROGRESS” note, the Suite C SaleHead 45634 FAIL spot, and the fa016ed engineer note that still asked for a tighter Local reseed. Detailed tables below stay as written. This page does not turn the original 113-cell Suite A run into an all-PASS matrix.
 
