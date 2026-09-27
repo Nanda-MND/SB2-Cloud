@@ -189,3 +189,64 @@ No fresh bak restore. No SB.exe rebuild. No Windows service. No SB2-git. Passwor
 
 - **Suite C read-only spot:** FAIL for SaleHead `45634` (`Cloud Deleted=1 IsDeleted=0`); other soft remnants/Purchase/Transfer checks PASS.
 - **Suite A all-txn matrix:** **IN PROGRESS** at `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\all_txn_20260926_225738\`; do not invent PASS/FAIL cells. Review `suiteA_run.log` for evidence.
+
+---
+
+## 2026-09-27 10:01 Asia/Rangoon (UTC+6:30) — Fail-only re-run after fa016ed identity fix
+
+**Tester:** Nanda-HP (`e921257a-2870-4ad6-9b01-cfd6b497ecc4`)  
+**Repo:** `D:\Project\SB2-Cloud` = `Nanda-MND/SB2-Cloud`  
+**Branch:** `cursor/sb2-dev-test-bootstrap-9fc4`  
+**HEAD:** `fa016ed4c6fa0fef1dc48453d73ab5be7be26f65` (`fa016ed` — Keep new cloud IDs at or above 2e9 and pull Local identities back down.)  
+**Ancestors:** `fa016ed`, `c71f1ca`, `4e81dd8` all OK (no rewind).  
+**Evidence:** `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\failonly_20260927_095448\` (not git-added)  
+**Constraints honored:** No bak restore; no SB.exe rebuild/replace; no Windows service SB.SyncAgent; no Live/Client; no SB2-git / Production MSSQL; passwords from env only (never printed); L2C inserts omit ID column (no IDENTITY_INSERT / no hardcoded 2000000000 on Local).
+
+### OVERALL: **PASS**
+
+Every required fail-only cell PASS; both DBs L2C Pending=0 and C2L Pending=0 after last `/once`.
+
+### Prep
+
+| Step | Result | Evidence |
+|------|--------|----------|
+| git fetch / checkout / pull --ff-only | PASS | `5a552ad` → `fa016ed` |
+| `SB2_Run_LocalPendingFix.ps1` (localhost/SB2/sa) | PASS (exit 0) | Fix_AllEntry ok; Generic refreshed; UserStatus/ListViewItem off. Script pull-down left ReturnStock*/GetStock* at IDENT_CURRENT=1999999999 (next~2e9) because prior junk rows at ID=1999999999 exist; **Tester additionally reseeds those four tables to true local max ID&lt;1999999999** (Heads→2, Details→1) so next Local insert &lt;&lt; 2e9. |
+| `SB2_Run_CloudAfterRestore.ps1` (no `-EnableTxnC2L`) | PASS (exit 0) | ReturnStockHead/GetStockHead RESEED next ~**2000000004** (cloud zone). ReturnStockDetail/GetStockDetail next ~2000000000 (OK_NEXT_AT_FLOOR; never allocates 1999999999 as new ID). |
+| `SB.SyncAgent\SB2_Dev_EncryptAndOnce.ps1` | PASS (exit 0) | NEW SyncAgent deployed: LWT **2026-09-27 09:49:28 Asia/Rangoon**, Len=**27136**, SHA256=`CD5C05122F3DF7A1FB1AF179D5F04907427E4BE2D9B4AF113E585DFD221654F4`; `/once` → Sync cycle completed. Second `/once` cleared residual Cloud C2L Detail Op=D Pending (15→0). |
+| Pre-cell Local+Cloud L2C/C2L Pending=0 | PASS | After second `/once` |
+
+### Fail-only cells (do not re-run the 113 PASS cells)
+
+| Cell | Result | Evidence |
+|------|--------|----------|
+| ReturnStock_NEW_C2L | **PASS** | CloudHead=**2000000004** Detail=2000000000; Local present; zone2e9=True; fail1999=False; Pending0 |
+| GetStock_NEW_C2L | **PASS** | CloudHead=**2000000004** Detail=2000000000; Local present; zone2e9=True; fail1999=False; Pending0 |
+| ReturnStock_DETHARD_L2C | **PASS** | Local Head=**3** Detail=2 (&lt;&lt;2e9); no Msg 2627; both sides detail absent; Det Op=D left=0/0; Pending0. (Requires true-local reseed after C2L NEW — see note.) |
+| ReturnStock_HEADSOFT_L2C | **PASS** | Local Head=**4**; Op=**D** (not U); Src Deleted=1 IsDeleted=1 DeletedAt set; Cloud present 1/1; Det Op=D absent both; Pending0 |
+| GetStock_DETHARD_L2C | **PASS** | Local Head=**3** Detail=2; Labsent=0 Cabsent=0; Det Op=D left=0/0; Pending0 |
+| GetStock_HEADSOFT_L2C | **PASS** | Local Head=**4**; Op=D; Src 1/1; Cloud 1/1 present; Det Op=D absent; Pending0 |
+| StockReceive_EDIT_L2C | **PASS** | Head=**71**; CloudMatch=1; Pending0 (no transport retry needed) |
+| SupplierOpening_EDIT_C2L | **PASS** | Head=**2000000004** zone2e9; LocalMatch=1; Pending0 |
+| ReturnReceive_HEADSOFT_C2L | **PASS** | Head=**2000000004**; OpD=1 Src=1 Local11=1 Present=1; Pending0 |
+| SaleHead 45634 (Cloud) | **PASS** | Deleted=**1**, IsDeleted=**1**, DeletedAt=**2026-09-27 03:18:34.843** (not null). Not hard-deleted. |
+
+### After last `/once` — Pending Direction/Status counts
+
+| DB | Pending/Syncing/DeadLetter | Other |
+|----|----------------------------|-------|
+| Local | **none** (L2C Pending=0, C2L Pending=0) | L2C Synced=389 |
+| Cloud | **none** (L2C Pending=0, C2L Pending=0) | C2L Synced=241; L2C Synced=216; C2L Conflict=2 (pre-existing LocalWinsSkipped; not Pending) |
+
+### Notes for engineers
+
+1. **Cloud NEW zone fixed by fa016ed:** prior Suite A fail had CloudHead=1999999999; this run allocates ≥2000000000.
+2. **Local L2C after C2L:** C2L IDENTITY_INSERT of cloud-zone IDs re-bumps Local `IDENT_CURRENT`. The committed `SB2_Reseed_LocalIdentity_BelowCloudFloor.sql` uses `MAX(ID) WHERE ID < 2000000000`, which can land on **1999999999** (next=2000000000) and collide with existing C2L rows (Msg 2627). Fail-only L2C cells required an extra reseed to `MAX(ID) WHERE ID < 1999999999` (true local) **immediately before** each Local insert family. Consider tightening the reseed script floor to `@CloudFloor - 1` exclusion (or exclude IDs ≥ 1999999999).
+3. EncryptAndOnce bin/obj dirt discarded (not committed). Evidence folder not git-added.
+
+### Sign-off
+
+- **OVERALL PASS**
+- HEAD: `fa016ed`
+- Results-only commit follows.
+
