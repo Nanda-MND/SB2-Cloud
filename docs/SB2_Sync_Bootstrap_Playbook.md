@@ -275,10 +275,14 @@ Optional later: C2L txn packs, ghost cleanups, purchase/sale diagnose scripts.
 
 ---
 
-## After SB2 goes live
+## SB2 one-click (verified pair)
 
-Do not fill live server names in this phase. Live/Client cutover is a separate task and is not approved.
+Suite A full matrix PASS is the basis. The one-click is `docs/sql/SB2_Run_OneClick_Deploy.ps1` and `docs/SB2_ONECLICK_DEPLOY.md`.
 
-1. After that cutover is approved, fill actual server names into an “as deployed” section.
-2. Keep SB and SB2 script fixes in sync when fixing Detail/Head delete bugs.
-3. Prefer shared `docs/sql` changes upstreamed to both repos.
+1. `-Phase Local` runs `SB2_Run_LocalPendingFix.ps1`, then `SB2_Run_Backup.ps1`.
+2. Restore that `.bak` as `db_abe8c0_sb2` in the hosting panel. Shared hosting does not accept `RESTORE` from the script.
+3. `-Phase Cloud` runs `SB2_Run_CloudAfterRestore.ps1` with no `-EnableTxnC2L`. The same files, in order, are `docs/sql/SB2_CloudAfterRestore_Ordered.sql`. `Cloud_Reseed_TransactionIdRanges.sql` must run or Cloud identities stay at the Local values from the backup.
+
+Targets stay localhost / `SB2` and `sql8006.site4now.net` / `db_abe8c0_sb2`. `SQL1002`, `db_abbe78_warehouse`, `db_abe8c0_erp`, `db_abe8c0_luckyone`, `SB1`, and `D:\MinnNandar\Software` stay refused. Do not install service `SB.SyncAgent`.
+
+Keep SB and SB2 script fixes in sync when fixing Detail/Head delete bugs. Prefer shared `docs/sql` changes upstreamed to both repos.
