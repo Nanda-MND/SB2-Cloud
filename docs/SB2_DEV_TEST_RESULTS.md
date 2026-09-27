@@ -1,5 +1,32 @@
 ﻿# SB2-Cloud Dev / Test acceptance results
 
+## Current summary (2026-09-27)
+
+This section is the current status. It supersedes the 2026-09-26 23:08 “Suite A IN PROGRESS” note, the Suite C SaleHead 45634 FAIL spot, and the fa016ed engineer note that still asked for a tighter Local reseed. Detailed tables below stay as written. This page does not turn the original 113-cell Suite A run into an all-PASS matrix.
+
+| Item | Status |
+|------|--------|
+| Fail-only at `fa016ed`, recorded in `49dd869` | PASS 10/10. Needed a manual Local reseed of ReturnStock/GetStock to `MAX(ID) < 1999999999`. |
+| LocalPendingFix assert at `17ac27f`; retest at `08fbf0b`; results at `83c9288` | PASS 10/10. No manual reseed. |
+| `IDENT_CURRENT` | Local ReturnStock/GetStock Head and Detail `<< 1999999999`. Cloud `>= 2000000000`. |
+| SaleHead 45634 | PASS. Cloud `Deleted=1`, `IsDeleted=1`, `DeletedAt` set. Not hard-deleted. |
+
+Evidence stays on disk only: `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\failonly_20260927_095448\` and `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\new folder\failonly17_20260927_104650\`. The all-txn folder `all_txn_20260926_225738` finished PASS=113 FAIL=9 SKIP=6. Those nine cells plus SaleHead 45634 were the fail-only set. Journal/Manufacture/Stock meta stayed SKIP.
+
+### Suite A prep (no runner script in this repo)
+
+`Run_SuiteA_AllTxn_Matrix.ps1` is not in the git tree. Before a fail-only or matrix run on the Dev PC:
+
+1. `docs/sql/SB2_Run_LocalPendingFix.ps1` on localhost / SB2. Stop if it aborts because ReturnStock or GetStock `IDENT_CURRENT >= 1999999999`.
+2. `docs/sql/SB2_Run_CloudAfterRestore.ps1` with no `-EnableTxnC2L`.
+3. `SB.SyncAgent/SB2_Dev_EncryptAndOnce.ps1`.
+
+L2C disposable inserts omit the ID column. Never `IDENTITY_INSERT` a cloud-zone ID on Local, and never hardcode `2000000000` on Local.
+
+---
+
+## Prior: Purchase* + Transfer* 12-cell (2026-09-26 22:43 Asia/Rangoon)
+
 Date: 2026-09-26 22:43 Asia/Rangoon (UTC+6:30)
 HEAD: `4e81dd821e421a14d1a21d914c8dc856ccfadf0b` (`4e81dd8`)
 Branch: `cursor/sb2-dev-test-bootstrap-9fc4`
@@ -185,10 +212,12 @@ No fresh bak restore. No SB.exe rebuild. No Windows service. No SB2-git. Passwor
 
 ---
 
-## 2026-09-26 23:08 Asia/Rangoon (UTC+6:30) — current evidence note
+## 2026-09-26 23:08 Asia/Rangoon (UTC+6:30) — superseded evidence note
 
-- **Suite C read-only spot:** FAIL for SaleHead `45634` (`Cloud Deleted=1 IsDeleted=0`); other soft remnants/Purchase/Transfer checks PASS.
-- **Suite A all-txn matrix:** **IN PROGRESS** at `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\all_txn_20260926_225738\`; do not invent PASS/FAIL cells. Review `suiteA_run.log` for evidence.
+Superseded by the current summary at the top. SaleHead 45634 later PASS (`IsDeleted=1`). Suite A left IN PROGRESS here; the run then finished PASS=113 FAIL=9 SKIP=6, and the nine FAIL cells passed on the fail-only re-runs. Do not treat this note as current, and do not invent a 113-cell PASS from it.
+
+- **Suite C read-only spot (historical):** FAIL for SaleHead `45634` (`Cloud Deleted=1 IsDeleted=0`); other soft remnants/Purchase/Transfer checks PASS.
+- **Suite A all-txn matrix (historical):** was IN PROGRESS at `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\all_txn_20260926_225738\`.
 
 ---
 
@@ -241,7 +270,7 @@ Every required fail-only cell PASS; both DBs L2C Pending=0 and C2L Pending=0 aft
 ### Notes for engineers
 
 1. **Cloud NEW zone fixed by fa016ed:** prior Suite A fail had CloudHead=1999999999; this run allocates ≥2000000000.
-2. **Local L2C after C2L:** C2L IDENTITY_INSERT of cloud-zone IDs re-bumps Local `IDENT_CURRENT`. The committed `SB2_Reseed_LocalIdentity_BelowCloudFloor.sql` uses `MAX(ID) WHERE ID < 2000000000`, which can land on **1999999999** (next=2000000000) and collide with existing C2L rows (Msg 2627). Fail-only L2C cells required an extra reseed to `MAX(ID) WHERE ID < 1999999999` (true local) **immediately before** each Local insert family. Consider tightening the reseed script floor to `@CloudFloor - 1` exclusion (or exclude IDs ≥ 1999999999).
+2. **Local L2C after C2L (closed by `17ac27f`):** this fa016ed run still used `MAX(ID) WHERE ID < 2000000000`, which landed on **1999999999**, so Tester hand-reseeded before the L2C cells. `17ac27f` reseeds to `MAX(ID) WHERE ID < 1999999999` and aborts `LocalPendingFix` if ReturnStock/GetStock stay at the sentinel. The 10:54 re-run (results `83c9288`) passed with no manual reseed.
 3. EncryptAndOnce bin/obj dirt discarded (not committed). Evidence folder not git-added.
 
 ### Sign-off
@@ -263,7 +292,7 @@ Code on `cursor/sb2-dev-test-bootstrap-9fc4` at `17ac27f`. This section records 
 | SaleHead 45634 Cloud `Deleted=1` `IsDeleted=0` | `4f35d2e`, repair in `fa016ed` | Head `Deleted=1` sets source `IsDeleted=1` and `DeletedAt` and enqueues Op=D. `SB2_Repair_HeadSoftDelete_Flags_CLOUD.sql` repairs older Cloud rows, including 45634, and does not queue outbox. |
 | StockReceive_EDIT_L2C, SupplierOpening_EDIT_C2L, ReturnReceive_HEADSOFT_C2L transport timeouts | `fa016ed` | `SyncEngine` retries a row up to 3 times on TCP, SSL, Named Pipes, or timeout (`maxAttempts = 3`). |
 
-The fail-only re-run above passed at `fa016ed` only after a manual reseed of those four Local identities. `17ac27f` is that reseed. It has not been re-run on Local SB2 from this commit. Cloud reseed is unchanged, so Cloud next stays `>= 2000000000`.
+The fa016ed fail-only section above passed only after a manual reseed. That gap is closed: the 10:54 re-run at `08fbf0b` (results `83c9288`) passed 10/10 with `LocalPendingFix` only and no manual reseed. Cloud reseed is unchanged, so Cloud next stays `>= 2000000000`.
 
 
 ---

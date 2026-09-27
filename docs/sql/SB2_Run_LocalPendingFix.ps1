@@ -9,8 +9,12 @@
   2) Redeploy SyncApply_Generic so Head Op=D soft-applies (int PK vs sql_variant).
   3) Pull Local identities at or above the 1999999999 sentinel back to
      MAX(ID) WHERE ID < 1999999999. Never reseeds Local up to 1999999999
-     or 2000000000. L2C inserts omit the ID column.
+     or 2000000000. L2C disposable inserts omit the ID column.
+     Never IDENTITY_INSERT or hardcode 2000000000 on Local.
      Aborts if ReturnStock/GetStock Head or Detail IDENT_CURRENT stays >= 1999999999.
+     Suite A / fail-only prep: run this script first, then
+     SB2_Run_CloudAfterRestore.ps1 (no -EnableTxnC2L), then
+     SB.SyncAgent\SB2_Dev_EncryptAndOnce.ps1. Honor the ASSERT abort.
   4) Turn UserStatus and ListviewItem sync off and clear their pending outbox.
 
   Password: -Password or env SB2_DEV_LOCAL_SQL_PASSWORD. Never written to disk.
