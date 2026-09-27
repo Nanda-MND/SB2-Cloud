@@ -7,8 +7,10 @@
   1) Refresh SyncInstall_Table and reinstall entry L2C triggers.
      Head Deleted=1 enqueues Op=D, and the source row gets IsDeleted=1.
   2) Redeploy SyncApply_Generic so Head Op=D soft-applies (int PK vs sql_variant).
-  3) Pull Local identities that were bumped to the cloud zone back below 2000000000.
-     Never reseeds Local up to that floor.
+  3) Pull Local identities at or above the 1999999999 sentinel back to
+     MAX(ID) WHERE ID < 1999999999. Never reseeds Local up to 1999999999
+     or 2000000000. L2C inserts omit the ID column.
+     Aborts if ReturnStock/GetStock Head or Detail IDENT_CURRENT stays >= 1999999999.
   4) Turn UserStatus and ListviewItem sync off and clear their pending outbox.
 
   Password: -Password or env SB2_DEV_LOCAL_SQL_PASSWORD. Never written to disk.
@@ -53,7 +55,7 @@ if ($generic -notmatch 'preserve-soft-delete-flags') {
 }
 
 Write-Host "Dev Local pending fix on $Server / $Database"
-Write-Host 'UserStatus and ListviewItem sync off. Head Op=D stays a soft delete. Local identities above the cloud floor are pulled down.'
+Write-Host 'UserStatus and ListviewItem sync off. Head Op=D stays a soft delete. Local identities at or above 1999999999 are pulled below that sentinel.'
 
 Invoke-Sb2SqlFiles -Server $Server -Database $Database -User $User -Password $Password -SqlDir $PSScriptRoot -Files $files
 

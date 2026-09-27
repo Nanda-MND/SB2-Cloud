@@ -381,34 +381,33 @@ SELECT ' + @insVals2;
         IF @hasIdentity = 1
             EXEC(N'SET IDENTITY_INSERT ' + @qualifiedTable + N' OFF;');
 
-        -- C2L into Local: IDENTITY_INSERT of ID >= 2e9 bumps IDENT_CURRENT into Cloud zone.
-        -- Reseed Local identity back to MAX(ID) below Cloud floor so new Local inserts stay low.
+        -- C2L into Local: IDENTITY_INSERT of ID >= 2e9 bumps IDENT_CURRENT into the cloud zone.
+        -- L2C inserts omit the ID column. Never IDENTITY_INSERT a 2e9 ID on Local.
+        -- Pull Local identity to MAX(ID) below the 1999999999 sentinel so the next
+        -- local insert cannot land on 1999999999 or 2000000000.
         IF @hasIdentity = 1 AND @Source = N'Cloud' AND @insRows > 0
            AND @pkType IN (N'int', N'bigint', N'smallint', N'tinyint')
         BEGIN
             DECLARE @CloudFloor bigint = 2000000000;
+            DECLARE @LocalCeiling bigint = 1999999999;
             DECLARE @insertedId bigint = TRY_CAST(JSON_VALUE(@PrimaryKeyJson, N'$.' + @pk) AS bigint);
             IF @insertedId IS NOT NULL AND @insertedId >= @CloudFloor
             BEGIN
                 DECLARE @maxLocalZone bigint;
                 DECLARE @reseedSql nvarchar(max) =
-                    N'SELECT @m = ISNULL(MAX(CAST(' + QUOTENAME(@pk) + N' AS bigint)), 0)
+                    N'SELECT @m = MAX(CAST(' + QUOTENAME(@pk) + N' AS bigint))
                       FROM ' + @qualifiedTable + N'
-                      WHERE CAST(' + QUOTENAME(@pk) + N' AS bigint) < @floor';
+                      WHERE CAST(' + QUOTENAME(@pk) + N' AS bigint) < @ceiling';
                 EXEC sp_executesql @reseedSql,
-                    N'@m bigint OUTPUT, @floor bigint',
-                    @m = @maxLocalZone OUTPUT, @floor = @CloudFloor;
-                -- No local-zone row yet: reseed to 0 so the next Local insert is 1.
-                -- Skipping the reseed left IDENT_CURRENT at 2e9 and the next insert collided.
-                IF @maxLocalZone IS NULL OR @maxLocalZone < 0
+                    N'@m bigint OUTPUT, @ceiling bigint',
+                    @m = @maxLocalZone OUTPUT, @ceiling = @LocalCeiling;
+                -- No true-local row: reseed to 0 so the next Local insert is 1.
+                IF @maxLocalZone IS NULL OR @maxLocalZone < 0 OR @maxLocalZone >= @LocalCeiling
                     SET @maxLocalZone = 0;
-                IF @maxLocalZone < @CloudFloor
-                BEGIN
-                    DECLARE @reseedCmd nvarchar(max) =
-                        N'DBCC CHECKIDENT (' + QUOTENAME(@TableName, N'''') + N', RESEED, '
-                        + CAST(@maxLocalZone AS nvarchar(30)) + N') WITH NO_INFOMSGS';
-                    EXEC(@reseedCmd);
-                END
+                DECLARE @reseedCmd nvarchar(max) =
+                    N'DBCC CHECKIDENT (' + QUOTENAME(@TableName, N'''') + N', RESEED, '
+                    + CAST(@maxLocalZone AS nvarchar(30)) + N') WITH NO_INFOMSGS';
+                EXEC(@reseedCmd);
             END
         END
     END
