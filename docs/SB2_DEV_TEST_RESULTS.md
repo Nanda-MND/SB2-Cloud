@@ -1,5 +1,13 @@
 # SB2-Cloud Dev / Test acceptance results
 
+## Current status
+
+Suite A full all-txn L2C/C2L matrix **OVERALL PASS** at results `e3f19a5` (prep HEAD `0591d2d`): **PASS=122 FAIL=0 SKIP=6**. Final Pending is 0 for Local and Cloud, both L2C and C2L. This supersedes the fail-only summary and any “not fully verified” or IN PROGRESS wording below. It is not a Live/Client or one-click-ready claim.
+
+Runnable transaction families in that matrix are verified. The six SKIP cells need real tables or paths before any coverage claim: Journal_META, Manufacture_META, Stock_META, CustSupTransfer_DETHARD_L2C, CustSupTransfer_DETHARD_C2L, CONFLICT_C4_CollidingID.
+
+Prep order used for this run: `SB2_Run_LocalPendingFix.ps1` (ASSERT abort if ReturnStock/GetStock `IDENT_CURRENT >= 1999999999`), then `SB2_Run_CloudAfterRestore.ps1` with no `-EnableTxnC2L`, then `SB.SyncAgent/SB2_Dev_EncryptAndOnce.ps1`. L2C inserts omit the ID column. No Local `IDENTITY_INSERT` of `2000000000`.
+
 ## Current summary (2026-09-27 Suite A full all-txn matrix)
 
 Date: 2026-09-27 ~11:56 Asia/Rangoon (UTC+6:30)
@@ -56,7 +64,7 @@ No Production/SQL1002/warehouse/Live/Client/SB2-git. No SB.exe rebuild. No Windo
 ---
 ## Prior summary (2026-09-27 fail-only)
 
-This section is the current status. It supersedes the 2026-09-26 23:08 “Suite A IN PROGRESS” note, the Suite C SaleHead 45634 FAIL spot, and the fa016ed engineer note that still asked for a tighter Local reseed. Detailed tables below stay as written. This page does not turn the original 113-cell Suite A run into an all-PASS matrix.
+Superseded by the Suite A full PASS at the top (results `e3f19a5`, PASS=122 FAIL=0 SKIP=6). This block remains the fail-only record. It closed the 2026-09-26 23:08 IN PROGRESS note, the SaleHead 45634 FAIL spot, and the fa016ed manual-reseed gap. The 2026-09-26 all-txn run stays PASS=113 FAIL=9 SKIP=6; it was not rewritten cell by cell. The 2026-09-27 matrix is a separate run.
 
 | Item | Status |
 |------|--------|
@@ -268,7 +276,7 @@ No fresh bak restore. No SB.exe rebuild. No Windows service. No SB2-git. Passwor
 
 ## 2026-09-26 23:08 Asia/Rangoon (UTC+6:30) — superseded evidence note
 
-Superseded by the current summary at the top. SaleHead 45634 later PASS (`IsDeleted=1`). Suite A left IN PROGRESS here; the run then finished PASS=113 FAIL=9 SKIP=6, and the nine FAIL cells passed on the fail-only re-runs. Do not treat this note as current, and do not invent a 113-cell PASS from it.
+Superseded by the Suite A full PASS at the top (results `e3f19a5`, PASS=122 FAIL=0 SKIP=6). SaleHead 45634 later PASS (`IsDeleted=1`). Suite A left IN PROGRESS here; that run finished PASS=113 FAIL=9 SKIP=6, then fail-only passed, then the separate 2026-09-27 matrix passed. Do not treat this note as current, and do not rewrite the 113/9/6 run as all-PASS.
 
 - **Suite C read-only spot (historical):** FAIL for SaleHead `45634` (`Cloud Deleted=1 IsDeleted=0`); other soft remnants/Purchase/Transfer checks PASS.
 - **Suite A all-txn matrix (historical):** was IN PROGRESS at `D:\Dev\SB2-Cloud-Runtime\e2e_evidence\all_txn_20260926_225738\`.
